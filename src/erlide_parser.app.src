@@ -1,0 +1,10 @@
+{application, erlide_parser,
+ [
+  {description, "A preprocessor+scanner+parser for Erlang that keeps track of the exact source code."},
+  {vsn, "0.1"},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
