@@ -50,9 +50,7 @@
 
 -module(erl_scan_local).
 
-test
-
-%%% External exports test test test 
+%%% External exports
 
 -export([string/1,string/2,string/3,tokens/3,tokens/4,
          format_error/1,reserved_word/1,
