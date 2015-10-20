@@ -1,4 +1,4 @@
-# erlide_parser 
+# erlide_parser [![Build Status](https://travis-ci.org/erlide/erlide_parser.svg?branch=master)](https://travis-ci.org/erlide/erlide_parser)
 
 _(suggestions for better names are welcome)_
 
