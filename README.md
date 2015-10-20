@@ -1,8 +1,10 @@
-# erlide_parser [![Build Status](https://travis-ci.org/erlide/erlide_parser.svg?branch=master)](https://travis-ci.org/erlide/erlide_parser)
+# erlide_parser 
 
 _(suggestions for better names are welcome)_
 
 An Erlang preprocessor+scanner+parser tailored for use in an IDE, keeping track of the exact source code in the files. It was originally developed as part of [erlide](https://github.com/erlide/erlide), but it is easier to handle and to get feedback if it is a separate project.
+
+[![Build Status](https://travis-ci.org/erlide/erlide_parser.svg?branch=master)](https://travis-ci.org/erlide/erlide_parser)
 
 ## Rationale
 
@@ -21,7 +23,7 @@ Having to keep an implementation of these tools parallel with the OTP ones is no
 * All source constructs are preserved, but we keep track of the expansion of macros and includes and also of conditional blocks. The original source text must be possible to reconstruct.
 * The lexical tokens are linked in several streams: the source code stream and the expanded stream.
 * The parser is mostly interested in the structure of the source file and thus ignores most details about the expressions inside forms, except for detecting usage of referenceable elements. This might also allow handling of ill-behaved macros, whose values are not correct expressions.
-* Nodes in the syntax trees produced by the parser must keep track of their respective ranges in the lexical token streams. Some nodes might have distinguished rangesof tokens that define their "main feature" or name.
+* Nodes in the syntax trees produced by the parser must keep track of their respective ranges in the lexical token streams. Some nodes might have distinguished ranges of tokens that define their "main feature" or name.
 * The tools must be able to support Erlang code that targets even older OTP versions than the latest. I think the customary (current + 2 older versions) policy is a good decision. This doesn't mean that it must run on older versions, but it must be able to correctly parse older code. I think that it can be required to run on the latest OTP version, thus being able to use all current features, because the kind of tools that would use this parser run usually on the developer's desktop, not on live systems. 
 * The APIs for the tools and the syntax tree should follow as much as possible the ones for the corresponding OTP alternatives.
 * The token location information should include even the offset (in characters) from the beginning of the file. 
