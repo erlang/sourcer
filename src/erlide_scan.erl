@@ -22,7 +22,7 @@
          filter_ws/1,
          filter_comments/1,
          filter_ws_comments/1]).
-
+ 
 -include("erlide_token.hrl").
 
 string(String) ->
@@ -114,25 +114,25 @@ convert_tokens([{'?', [{line, L}, {column, O}|_]}, {var, [{line, L}, {column, O1
     convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
 convert_tokens([{dot, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
     %% erl_scan conflates the dot with following whitespace.
-    T = #token{kind=dot, line=L, offset=Ofs, length=1, text=[hd(Txt)]},
+    T = #token{kind=dot, attributes=#attributes{line=L, offset=Ofs, length=1, text=[hd(Txt)]}},
     case Txt of
         "." ->
             convert_tokens(Rest, Ofs+1, [T | Acc]);
         _ ->
-            T1 = #token{kind=white_space, line=L, offset=Ofs+1, length=length(Txt)-1, text=list_to_binary(tl(Txt))},
+            T1 = #token{kind=white_space, attributes=#attributes{line=L, offset=Ofs+1, length=length(Txt)-1, text=list_to_binary(tl(Txt))}},
             convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
     end;
 convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}], _} | Rest], Ofs, Acc) when What==white_space; What==comment ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=unicode:characters_to_binary(Txt)},
+    T = #token{kind=What, attributes=#attributes{line=L, offset=Ofs, length=length(Txt), text=unicode:characters_to_binary(Txt)}},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
 convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}], Sym} | Rest], Ofs, Acc) ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt, value=Sym},
+    T = #token{kind=What, attributes=#attributes{line=L, offset=Ofs, length=length(Txt), text=Txt}, value=Sym},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
 convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt},
+    T = #token{kind=What, attributes=#attributes{line=L, offset=Ofs, length=length(Txt), text=Txt}},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]).
 
 make_macro(L, O, G, Txt) ->
     V = list_to_atom(Txt),
-    #token{kind=macro, line=L, offset=O, length=G, text=Txt, value=V}.
+    #token{kind=macro, attributes=#attributes{line=L, offset=O, length=G, text=Txt}, value=V}.
 

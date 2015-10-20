@@ -469,7 +469,7 @@ convert_attributes(Toks) when is_list(Toks) ->
 
 convert_attributes(T, Ofs) ->
     Attrs = element(2, T),
-    {length, Length} = erl_scan:attributes_info(Attrs, length),
+    Length = length(erl_anno:text(Attrs)),
     NewAttrs = maps:from_list([{length,Length},{offset,Ofs}|Attrs]),
     {setelement(2, T, NewAttrs), Ofs+Length}.
 
