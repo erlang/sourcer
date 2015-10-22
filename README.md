@@ -27,6 +27,7 @@ Having to keep an implementation of these tools parallel with the OTP ones is no
 * The tools must be able to support Erlang code that targets even older OTP versions than the latest. I think the customary (current + 2 older versions) policy is a good decision. This doesn't mean that it must run on older versions, but it must be able to correctly parse older code. I think that it can be required to run on the latest OTP version, thus being able to use all current features, because the kind of tools that would use this parser run usually on the developer's desktop, not on live systems. 
 * The APIs for the tools and the syntax tree should follow as much as possible the ones for the corresponding OTP alternatives.
 * The token location information should include even the offset (in characters) from the beginning of the file. 
+* It would be cool if even parse transforms could be handled while keeping all connections to the original code, but that is probably for future development. 
 
 ## Design
 
