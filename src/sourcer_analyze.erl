@@ -116,43 +116,43 @@ analyze_references(Toks) when is_list(Toks) ->
 
 analyze_references([], Acc) ->
     lists:reverse(Acc);
-analyze_references([{'fun',Pos1},{atom,_,Name},{'/',_},{integer,Pos2,Arity}|Toks], Acc) ->
+analyze_references([{'fun',Pos1},{atom,#{value:=Name}},{'/',_},{integer,Pos2=#{value:=Arity}}|Toks], Acc) ->
     Ref = #functionref{loc=mk_loc(Pos1, Pos2),
                        id=#function_id{module='$this$', name=Name, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{'fun',Pos1},{atom,_,NameM},{':',_},{atom,_,NameF},{'/',_},{integer,Pos2,Arity}|Toks], Acc) ->
+analyze_references([{'fun',Pos1},{atom,#{value:=NameM}},{':',_},{atom,#{value:=NameF}},{'/',_},{integer,Pos2=#{value:=Arity}}|Toks], Acc) ->
     Ref = #functionref{loc=mk_loc(Pos1, Pos2),
                        id=#function_id{module=NameM, name=NameF, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{atom,Pos1,NameF},{'(',_}=T|Toks], Acc) ->
+analyze_references([{atom,Pos1=#{value:=NameF}},{'(',_}=T|Toks], Acc) ->
     Arity = get_arity([T|Toks]),
     Ref = #functionref{loc=mk_loc(Pos1, Pos1),
                        id=#function_id{module='$this$', name=NameF, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{atom,Pos1,NameM},{':',_},{atom,Pos2,NameF}|Toks], Acc) ->
+analyze_references([{atom,Pos1=#{value:=NameM}},{':',_},{atom,Pos2=#{value:=NameF}}|Toks], Acc) ->
     Arity = get_arity(Toks),
     Ref = #functionref{loc=mk_loc(Pos1, Pos2),
                        id=#function_id{module=NameM, name=NameF, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{macro,Pos1,NameM},{':',_},{atom,Pos2,NameF}|Toks], Acc) ->
+analyze_references([{macro,Pos1=#{value:=NameM}},{':',_},{atom,Pos2=#{value:=NameF}}|Toks], Acc) ->
     Arity = get_arity(Toks),
     Ref = #functionref{loc=mk_loc(Pos1, Pos2),
                        id=#function_id{module=NameM, name=NameF, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{atom,Pos1,NameM},{':',_},{macro,Pos2,NameF}|Toks], Acc) ->
+analyze_references([{atom,Pos1=#{value:=NameM}},{':',_},{macro,Pos2=#{value:=NameF}}|Toks], Acc) ->
     Arity = get_arity(Toks),
     Ref = #functionref{loc=mk_loc(Pos1, Pos2),
                        id=#function_id{module=NameM, name=NameF, arity=Arity}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{'#',Pos1},{atom,_,Name},{'.',_},{atom,Pos2,Field}|Toks], Acc) ->
+analyze_references([{'#',Pos1},{atom,#{value:=Name}},{'.',_},{atom,Pos2=#{value:=Field}}|Toks], Acc) ->
     %% TODO fill module name
     Ref = #recordfieldref{loc=mk_loc(Pos1, Pos2),
                           id=#recordfield_id{record=#record_id{module='$this$', name=Name}, name=Field}},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{'#',Pos1},{atom,Pos2,Name}|Toks], Acc) ->
+analyze_references([{'#',Pos1},{atom,Pos2=#{value:=Name}}|Toks], Acc) ->
     Ref = #recordref{loc=mk_loc(Pos1, Pos2), id=Name},
     analyze_references(Toks, [Ref|Acc]);
-analyze_references([{'#',Pos1},{macro,Pos2,Name}|Toks], Acc) ->
+analyze_references([{'#',Pos1},{macro,Pos2=#{value:=Name}}|Toks], Acc) ->
     Ref = #recordref{loc=mk_loc(Pos1, Pos2), id=Name},
     analyze_references(Toks, [Ref|Acc]);
 analyze_references([{var,Pos1,Name}|Toks], Acc) ->
@@ -163,7 +163,7 @@ analyze_references([_|Toks], Acc) ->
 
 analyze_macro_references([], Acc) ->
     lists:reverse(Acc);
-analyze_macro_references([{macro,Pos1,Name}|Toks], Acc) ->
+analyze_macro_references([{macro,Pos1=#{value:=Name}}|Toks], Acc) ->
     Ref = #macroref{loc=mk_loc(Pos1, Pos1), id=Name},
     analyze_macro_references(Toks, [Ref|Acc]);
 analyze_macro_references([_|Toks], Acc) ->
@@ -186,7 +186,7 @@ module_keys() ->
      export, import
     ].
 
-group_forms(Forms)  ->
+group_forms(#{forms:=Forms})  ->
     group_forms(module_keys(), Forms, []).
 
 group_forms(_, [], Acc) ->

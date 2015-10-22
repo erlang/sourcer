@@ -16,65 +16,57 @@
 -module(sourcer_parse).
 
 -export([
-         scan/1,
-         string/1,
-         tokens/1,
          string/2,
          tokens/2
         ]).
 
 -include("sourcer_parse.hrl").
 
-%-spec scan(string()) -> {ok, {[[token()]], [{[token()], [token()]}]}}.
-scan(D) ->
-    %% TODO why not call sourcer_scan?
-    case erl_scan_local:string(D, {0,1}, [return, text]) of
-        {ok, Toks, _} ->
-            {Toks1, _} = convert_attributes(Toks),
-            Toks2 = split_at_dot(fix_macro_tokens(Toks1)),
-            Toks3 = lists:delete([], [group_top_comments(F) || F<-Toks2]),
-            Filtered = filter_whitespace_comments(Toks3),
-            {ok, {Toks2, Filtered}};
-        Err ->
-            Err
-    end.
-
-string(D) when is_list(D) ->
-    string(D, #context{}).
-
 string(D, Context) when is_list(D), is_record(Context, context) ->
-    case scan(D) of
-        {ok, {_FormToks, FilteredTokens}} ->
-            {ok, tokens(FilteredTokens, Context)};
-        Err ->
-            Err
+    case sourcer_scan:string(D) of
+        {ok, Toks, _} ->
+            {ok, tokens(Toks, Context)};
+        _Err ->
+            _Err
     end.
-
-tokens(Toks) ->
-    tokens(Toks, #context{}).
 
 tokens(Toks, Context) ->
-    lists:mapfoldl(fun parse_form/2, Context, Toks).
+    Raw = split_at_dot(Toks),
+    {Parsed, NewContext} = parse_forms(Raw, Context),
+    {#{all=>Toks, rawForms=>Raw, forms=>Parsed}, NewContext}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-filter_whitespace_comments(Toks) ->
-    [filter_tokens(T) || T<-Toks].
+parse_forms(Toks, Context) ->
+    lists:mapfoldl(fun parse_form/2, Context, Toks).
 
-group_top_comments(Toks) ->
-    group_top_comments(Toks, []).
+%% keep track of macro context
+parse_form(Ts, Context) ->
+    {TopComments, Ts1} = extract_top_comments(Ts),
+    Ts2 = filter_tokens(Ts1),
+    {Form, Ctx} = do_parse_form(Ts2, Context, []),
+    Form2 = update_attributes(Form,
+                              #{active=>is_active_context(Context),
+                                comments=>compact_comments(TopComments)}),
+    {Form2, Ctx}.
 
-group_top_comments([{comment, _, _}=C, {white_space, _, _}|Toks], Acc) ->
-    group_top_comments(Toks, [C|Acc]);
-group_top_comments([{comment, _, _}=C|Toks], Acc) ->
-    group_top_comments(Toks, [C|Acc]);
-group_top_comments([{white_space, _, _}=C|Toks], Acc) ->
-    group_top_comments(Toks, [C|Acc]);
-group_top_comments(Toks, Acc) ->
-    [compact_comments(X) || X<-group_comments(lists:reverse(Acc))] ++ Toks.
+update_attributes(Form, NewAttrs) ->
+    Attrs0 = element(2, Form),
+    Attrs1 = maps:merge(Attrs0, NewAttrs),
+    setelement(2, Form, Attrs1).
+
+extract_top_comments(Toks) ->
+    extract_top_comments(Toks, []).
+
+extract_top_comments([{comment, _}=C|Toks], Acc) ->
+    extract_top_comments(Toks, [C|Acc]);
+extract_top_comments([{white_space, _}=C|Toks], Acc) ->
+    extract_top_comments(Toks, Acc);
+extract_top_comments(Toks, Acc) ->
+    {lists:reverse(Acc), Toks}.
 
 top_comment(Comments) ->
-    lists:filter(fun({comment,_,_})->true; (_)->false end, Comments).
+    lists:filter(fun({comment,_})->true; (_)->false end, Comments).
 
 %% group comments with same level and no spaces inbetween
 group_comments(C) ->
@@ -98,19 +90,19 @@ get_first_group(Level, [H|T]=L, Acc) ->
     end.
 
 skip_white_at_start(L) ->
-    lists:dropwhile(fun({white_space,_,_})->true; (_)->false end, L).
+    lists:dropwhile(fun({white_space,_})->true; (_)->false end, L).
 
 compact_comments([]) ->
     {comments, none, [], 0};
 compact_comments(L) ->
     Level = comment_level(hd(L)),
-    Fun = fun({comment, _, C}, Acc) -> [skip_percent(C)|Acc] end,
+    Fun = fun({comment, #{value:=C}}, Acc) -> [skip_percent(C)|Acc] end,
     {comments, element(2, hd(L)), lists:reverse(lists:foldl(Fun, [], L)), Level}.
 
-comment_level({comment, _, "%%%%"++_}) -> 4;
-comment_level({comment, _, "%%%"++_}) -> 3;
-comment_level({comment, _, "%%"++_}) -> 2;
-comment_level({comment, _, "%"++_}) -> 1;
+comment_level({comment, #{text:="%%%%"++_}}) -> 4;
+comment_level({comment, #{text:="%%%"++_}}) -> 3;
+comment_level({comment, #{text:="%%"++_}}) -> 2;
+comment_level({comment, #{text:="%"++_}}) -> 1;
 comment_level(_) -> 0.
 
 skip_percent("%"++L) ->
@@ -118,39 +110,28 @@ skip_percent("%"++L) ->
 skip_percent(L) ->
     L.
 
-%% keep track of macro context
-%% TODO make sure the context from includes is computed and used
-parse_form(Ts, Context) ->
-    {Form, Ctx} = do_parse_form(Ts, Context, []),
-    Attrs0 = element(2, Form),
-    Attrs1 = Attrs0#{active=>is_active_context(Context)},
-    Form2 = setelement(2, Form, Attrs1),
-    {Form2, Ctx}.
+%% TODO set 'active' attribute on form, if
+do_parse_form([{atom,_}|_]=Ts, Context, Comments) ->
+    {parse_function(Ts, lists:reverse(Comments)), Context};
+do_parse_form([{'-',_}|_]=Ts, Context, Comments) ->
+    Attr = parse_attribute(Ts, lists:reverse(Comments)),
+    NewContext = get_context(Attr, Context),
+    {Attr, NewContext};
+do_parse_form(Ts, Context, _Comments) ->
+    {parse_unknown(Ts), Context}.
 
-do_parse_form(Ts, Context, Comments) ->
-    %% TODO set 'active' attribute on form, if
-    case element(1, hd(Ts)) of
-        atom ->
-            {parse_function(Ts, lists:reverse(Comments)), Context};
-        '-' ->
-            Attr = parse_attribute(Ts, lists:reverse(Comments)),
-            NewContext = get_context(Attr, Context),
-            {Attr, NewContext};
-        comments ->
-            do_parse_form(tl(Ts), Context, [hd(Ts)|Comments]);
-        _ ->
-            {parse_unknown(Ts), Context}
-    end.
-
-get_context({'define', _, Name, Arity, _, _}, #context{defines=Defs, macros=Macros}=Ctx) ->
-    Ctx#context{defines=sets:add_element(no_attrs(Name), Defs),
-                macros=[{no_attrs(Name), Arity}|Macros]};
-get_context({'undef', _, Name}, #context{defines=Defs, macros=Macros}=Ctx) ->
-    Ctx#context{defines=sets:del_element(no_attrs(Name), Defs),
-                macros=lists:filter(fun({X, _})-> X =/= no_attrs(Name) end, Macros)};
-get_context({'ifdef', _, Name}, #context{active=Active}=Ctx) ->
+get_context({'define', _, {_,#{value:=Name}}, Arity, _, _}, #context{defines=Defs, macros=Macros}=Ctx) ->
+    Ctx#context{defines=sets:add_element(Name, Defs),
+                macros=[{Name, Arity}|Macros]};
+get_context({'undef', _, {_, #{value:=Name}}}, #context{defines=Defs, macros=Macros}=Ctx) ->
+    Ctx#context{defines=sets:del_element(Name, Defs),
+                macros=lists:filter(fun({X, _})->
+                                            X =/= Name
+                                    end,
+                                    Macros)};
+get_context({'ifdef', _, {_,#{value:=Name}}}, #context{active=Active}=Ctx) ->
     Ctx#context{active=[Name|Active]};
-get_context({'ifndef', _, Name}, #context{active=Active}=Ctx) ->
+get_context({'ifndef', _, {_,#{value:=Name}}}, #context{active=Active}=Ctx) ->
     Ctx#context{active=[{'not',Name}|Active]};
 get_context({'else', _}, #context{active=[Crt|Active]}=Ctx) ->
     New = case Crt of
@@ -172,17 +153,17 @@ get_context(_, Context) ->
 parse_unknown([H|_]=Ts) ->
     {unknown, element(2, H), Ts}.
 
-parse_attribute([{'-', Pos},{atom,_,'ifdef'},{'(', _},Name,{')',_}], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='ifdef'}},{'(', _},Name,{')',_}], Comments) ->
     {ifdef, Pos#{comments=>Comments}, Name};
-parse_attribute([{'-', Pos},{atom,_,'ifndef'},{'(', _},Name,{')',_}], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='ifndef'}},{'(', _},Name,{')',_}], Comments) ->
     {ifndef, Pos#{comments=>Comments}, Name};
-parse_attribute([{'-', Pos},{atom,_,'else'}], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='else'}}], Comments) ->
     {else, Pos#{comments=>Comments}};
-parse_attribute([{'-', Pos},{atom,_,'endif'}], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='endif'}}], Comments) ->
     {endif, Pos#{comments=>Comments}};
-parse_attribute([{'-', Pos},{atom,_,'undef'},{'(', _},Name,{')',_}], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='undef'}},{'(', _},Name,{')',_}], Comments) ->
     {undef, Pos#{comments=>Comments}, Name};
-parse_attribute([{'-', Pos},{atom,_,'define'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='define'}}|Ts], Comments) ->
     [Name | Args0] = sourcer_util:middle(Ts),
     {Args, Value} = case Args0 of
                         [] ->
@@ -198,10 +179,10 @@ parse_attribute([{'-', Pos},{atom,_,'define'}|Ts], Comments) ->
                     end,
     Arity = length(Args),
     {define, Pos#{comments=>Comments}, Name, Arity, Args, Value};
-parse_attribute([{'-', Pos},{atom,_,'record'}|Ts], Comments) ->
-    [{atom, _, Name}, {',', _} | Def] = sourcer_util:middle(Ts),
+parse_attribute([{'-', Pos},{atom,#{value:='record'}}|Ts], Comments) ->
+    [{atom, #{value:=Name}}, {',', _} | Def] = sourcer_util:middle(Ts),
     {record, Pos#{comments=>Comments}, Name, record_def(Def)};
-parse_attribute([{'-', Pos},{atom,_,'type'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='type'}}|Ts], Comments) ->
     Ts1 = case hd(Ts) of
               {'(',_} ->
                   sourcer_util:middle(Ts);
@@ -211,7 +192,7 @@ parse_attribute([{'-', Pos},{atom,_,'type'}|Ts], Comments) ->
     {[Name|Args0], Def} = split_at(Ts1, '::'),
     Args = split_at_comma(sourcer_util:middle(Args0)),
     {type, Pos#{comments=>Comments}, Name, Args, Def};
-parse_attribute([{'-', Pos},{atom,_,'opaque'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='opaque'}}|Ts], Comments) ->
     Ts1 = case hd(Ts) of
               {'(',_} ->
                   sourcer_util:middle(Ts);
@@ -221,42 +202,42 @@ parse_attribute([{'-', Pos},{atom,_,'opaque'}|Ts], Comments) ->
     {[Name|Args0], Def} = split_at(Ts1, '::'),
     Args = split_at_comma(sourcer_util:middle(Args0)),
     {opaque, Pos#{comments=>Comments}, Name, Args, Def};
-parse_attribute([{'-', Pos},{atom,_,'spec'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='spec'}}|Ts], Comments) ->
     {M, F, Sigs} = parse_spec(Ts),
     {spec, Pos#{comments=>Comments}, M, F, Sigs};
-parse_attribute([{'-', Pos},{atom,_,'callback'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='callback'}}|Ts], Comments) ->
     {_, F, [Sigs]} = parse_spec(Ts),
     {callback, Pos#{comments=>Comments}, F, Sigs};
-parse_attribute([{'-', Pos},{atom,_,'export'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='export'}}|Ts], Comments) ->
     Fs = split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
     {export, Pos#{comments=>Comments}, Fs};
-parse_attribute([{'-', Pos},{atom,_,'export_type'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='export_type'}}|Ts], Comments) ->
     Fs = split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
     {export_type, Pos#{comments=>Comments}, Fs};
-parse_attribute([{'-', Pos},{atom,_,'import'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='import'}}|Ts], Comments) ->
     {M, Fs0} = split_at(sourcer_util:middle(Ts), ','),
     Fs = split_at_comma(sourcer_util:middle(Fs0)),
     {import, Pos#{comments=>Comments}, M, Fs};
-parse_attribute([{'-', Pos},{atom,_,'module'},{'(',_},{atom,_,Name}|_], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='module'}},{'(',_},{atom,#{value:=Name}}|_], Comments) ->
     {module, Pos#{comments=>Comments}, Name};
-parse_attribute([{'-', Pos},{atom,_,'compile'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='compile'}}|Ts], Comments) ->
     {compile, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
-parse_attribute([{'-', Pos},{atom,_,'vsn'}|Vsn], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='vsn'}}|Vsn], Comments) ->
     {vsn, Pos#{comments=>Comments}, sourcer__util:middle(Vsn)};
-parse_attribute([{'-', Pos},{atom,_,'on_load'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='on_load'}}|Ts], Comments) ->
     {on_load, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
-parse_attribute([{'-', Pos},{atom,_,'behaviour'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='behaviour'}}|Ts], Comments) ->
     {behaviour, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
-parse_attribute([{'-', Pos},{atom,_,'behavior'}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='behavior'}}|Ts], Comments) ->
     {behaviour, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
-parse_attribute([{'-', Pos},{atom,_,'include'},{'(',_},{string,_,Str}|_], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='include'}},{'(',_},{string,#{value:=Str}}|_], Comments) ->
     {include, Pos#{comments=>Comments}, Str};
-parse_attribute([{'-', Pos},{atom,_,'include_lib'},{'(',_},{string,_,Str}|_], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:='include_lib'}},{'(',_},{string,#{value:=Str}}|_], Comments) ->
     {include_lib, Pos#{comments=>Comments}, Str};
-parse_attribute([{'-', Pos},{atom,_,Name}|Ts], Comments) ->
+parse_attribute([{'-', Pos},{atom,#{value:=Name}}|Ts], Comments) ->
     {attribute, Pos#{comments=>Comments}, Name, Ts}.
 
-parse_function([{atom, Pos, Name}|_]=Ts, Comments) ->
+parse_function([{atom, Pos=#{value:=Name}}|_]=Ts, Comments) ->
     Clauses = parse_clauses(Ts),
     Arity = length(element(3, hd(Clauses))),
     {function, Pos#{comments=>Comments}, Name, Arity, Clauses}.
@@ -266,7 +247,7 @@ parse_clauses(Ts) ->
     [parse_clause(L) || L<-R].
 
 parse_clause(Ts) ->
-    [H |Toks] = Ts,
+    [{_,P} | Toks] = Ts,
     {Args0, Rest} = split_at_brace(Toks),
     Args = split_at_comma(sourcer_util:middle(Args0)),
     {Guards0, Body} = split_at_arrow(Rest),
@@ -276,20 +257,20 @@ parse_clause(Ts) ->
                  [_|T] ->
                      T
              end,
-    {clause, element(2, H), Args, Guards, Body}.
+    {clause, P, Args, Guards, Body}.
 
 %% Split token list at dots (not included in result).
 split_at_dot(L) ->
-    split_at_dot(L , [], []).
+    split_at_dot(L, [], []).
 
 split_at_dot([], R, []) ->
     lists:reverse(R);
 split_at_dot([], Acc, Crt) ->
     lists:reverse(Acc, [lists:reverse(Crt)]);
-split_at_dot([{dot, _}|T], Acc, Crt) ->
-    split_at_dot(T, [lists:reverse(Crt)|Acc], []);
-split_at_dot([H|T], Acc, Crt) ->
-    split_at_dot(T, Acc, [H|Crt]).
+split_at_dot([{dot,_}|Ts], Acc, Crt) ->
+    split_at_dot(Ts, [lists:reverse(Crt)|Acc], []);
+split_at_dot([H|Ts], Acc, Crt) ->
+    split_at_dot(Ts, Acc, [H|Crt]).
 
 %% Split token list at "; Name (", where Name is the same
 %% as the first token which must be an atom.
@@ -297,19 +278,20 @@ split_at_dot([H|T], Acc, Crt) ->
 split_at_semicolon_name([]) ->
     [];
 split_at_semicolon_name(L) ->
-    {atom, _, Name} = hd(L),
+    {atom, #{value:=Name}} = hd(L),
     split_at_semicolon_name(L , Name, [], []).
 
 split_at_semicolon_name([], _, R, []) ->
     lists:reverse(R);
 split_at_semicolon_name([], _, Acc, Crt) ->
     lists:reverse(Acc, [lists:reverse(Crt)]);
-split_at_semicolon_name([{';', _}, {atom, _, Name}=H1, {'(', _}=H2|T],
+split_at_semicolon_name([{';', _}, {atom, #{value:=Name}}=H1, {'(', _}=H2|T],
                         Name, Acc, Crt) ->
     split_at_semicolon_name([H1, H2|T], Name, [lists:reverse(Crt)|Acc], []);
 split_at_semicolon_name([H|T], Name, Acc, Crt) ->
     split_at_semicolon_name(T, Name, Acc, [H|Crt]).
 
+%% Split token list at "; ("
 split_at_semicolon([]) ->
     [];
 split_at_semicolon(L) ->
@@ -345,7 +327,7 @@ split_at_comma([H|T], Acc, Crt) ->
     end.
 
 
-%% Split L at the first Tok, keeping track of brace levels.
+%% Split L at the first matching brace, keeping track of brace levels.
 %% We assume that the start brace is the first element of the list.
 split_at_brace([]) ->
     {[], []};
@@ -359,7 +341,7 @@ split_at_brace([H|T]=L) ->
 
 split_at_brace([], _, Acc) ->
     {lists:reverse(Acc), []};
-split_at_brace([H|T], End, Acc) when element(1,H)==End ->
+split_at_brace([{End,_}=H|T], End, Acc) ->
     {lists:reverse([H|Acc]), T};
 split_at_brace([H|T], End, Acc) ->
     case token_pair(element(1, H)) of
@@ -397,19 +379,16 @@ split_at([H|Rest], Delim, R) ->
 filter_tokens(Toks) ->
     lists:filter(fun filter_token/1, Toks).
 
-filter_token(E) ->
-    case element(1, E) of
-        white_space ->
-            false;
-        comment ->
-            false;
-        _ ->
-            true
-    end.
+filter_token({white_space, _}) ->
+    false;
+filter_token({comment, _}) ->
+    false;
+filter_token(_) ->
+    true.
 
 record_def(Ts) ->
     Fields = split_at_comma(sourcer_util:middle(Ts)),
-    Fun = fun([{atom,Pos,Name}|TypeDef]) ->
+    Fun = fun([{atom,Pos=#{value:=Name}}|TypeDef]) ->
                   Def0 = case TypeDef of
                              [{'=',_}|_] ->
                                  tl(TypeDef);
@@ -438,9 +417,6 @@ parse_spec(Ts) ->
     Sigs = lists:map(Fun, Cls),
     {M, F, Sigs}.
 
-no_attrs(T) ->
-    setelement(2, T, 0).
-
 is_active_context(#context{defines=Defs, active=Acts}) ->
     Fun = fun(A, Acc) -> Acc andalso is_active_define(A, Defs) end,
     lists:foldl(Fun, true, Acts).
@@ -449,28 +425,4 @@ is_active_define({'not', A}, Defs) ->
     sets:is_element({'not', A}, Defs) orelse not sets:is_element(A, Defs);
 is_active_define(A, Defs) ->
     sets:is_element(A, Defs) andalso not sets:is_element({'not', A}, Defs).
-
-fix_macro_tokens(Toks) ->
-    fix_macro_tokens(Toks, []).
-
-fix_macro_tokens([], Acc) ->
-    lists:reverse(Acc);
-fix_macro_tokens([{'?',P1},{atom,P2,A}|T], Acc) ->
-    fix_macro_tokens(T, [{macro, mash_pos(P1, P2), A}|Acc]);
-fix_macro_tokens([{'?',P1},{var,P2,A}|T], Acc) ->
-    fix_macro_tokens(T, [{macro, mash_pos(P1, P2), A}|Acc]);
-fix_macro_tokens([H|T], Acc) ->
-    fix_macro_tokens(T, [H|Acc]).
-
-mash_pos(#{}=P1,#{text:=T2}) ->
-    P1#{text=>[$?|T2]}.
-
-convert_attributes(Toks) when is_list(Toks) ->
-    lists:mapfoldl(fun convert_attributes/2, 0, Toks).
-
-convert_attributes(T, Ofs) ->
-    Attrs = element(2, T),
-    Length = length(erl_anno:text(Attrs)),
-    NewAttrs = maps:from_list([{length,Length},{offset,Ofs}|Attrs]),
-    {setelement(2, T, NewAttrs), Ofs+Length}.
 

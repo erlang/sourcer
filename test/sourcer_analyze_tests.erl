@@ -1,7 +1,7 @@
 -module(sourcer_analyze_tests).
 
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
+-include("sourcer_parse.hrl").
 
 analyze_module_test_() ->
     {Mod, _} = parse(""
@@ -14,16 +14,16 @@ analyze_module_test_() ->
     [
      ?_assertMatch([{module, _, fox}],
                    find_forms(module, Mod)),
-     ?_assertMatch([{export,_,[[{atom,_,a},{'/',_},{integer,_,2}]]},
-                    {export,_,[[{atom,_,b},{'/',_},{integer,_,3}]]}],
+     ?_assertMatch([{export,_,[[{atom,#{value:=a}},{'/',_},{integer,#{value:=2}}]]},
+                    {export,_,[[{atom,#{value:=b}},{'/',_},{integer,#{value:=3}}]]}],
                    find_forms(export, Mod)),
      ?_assertMatch([{include, _, "bar.hrl"}],
                    find_forms(include, Mod)),
      ?_assertMatch([{function,_,fow,2,
                      [{clause,_,
-                       [[{var,_,'A'}],[{'[',_},{var,_,'X'},{'|',_},{var,_,'Y'},{']',_}]],
+                       [[{var,#{value:='A'}}],[{'[',_},{var,#{value:='X'}},{'|',_},{var,#{value:='Y'}},{']',_}]],
                        [],
-                       [{'{',_},{var,_,'X'},{',',_},{var,_,'A'},{'+',_},{var,_,'Y'},{'}',_}]}]}],
+                       [{'{',_},{var,#{value:='X'}},{',',_},{var,#{value:='A'}},{'+',_},{var,#{value:='Y'}},{'}',_}]}]}],
                    find_forms(function, Mod))
     ].
 
@@ -32,16 +32,16 @@ find_forms_test_() ->
                      "-module(fox).\n"
                      "-export([a/2]).\n"
                      "-export([b/3]).\n"
-                     "-include(\"bar.hrl\").\n"
+                     "-include_lib(\"bar.hrl\").\n"
                      "fow(A) -> A.\n"
                     ),
     [
      ?_assertMatch([{module,[{module,_,fox}]},
-                    {export,[{export,_,[[{atom,_,b},{'/',_},{integer,_,3}]]},
-                             {export,_,[[{atom,_,a},{'/',_},{integer,_,2}]]}]},
-                    {include,[{include,_,"bar.hrl"}]},
+                    {export,[{export,_,[[{atom,#{value:=b}},{'/',_},{integer,#{value:=3}}]]},
+                             {export,_,[[{atom,#{value:=a}},{'/',_},{integer,#{value:=2}}]]}]},
+                    {include_lib,[{include_lib,_,"bar.hrl"}]},
                     {function,[{function,_,fow,1,
-                                [{clause,_,[[{var,_,'A'}]],[],[{var,_,'A'}]}]}]}],
+                                [{clause,_,[[{var,#{value:='A'}}]],[],[{var,#{value:='A'}}]}]}]}],
                    sourcer_analyze:group_forms(Mod))
     ].
 
@@ -68,22 +68,22 @@ analyze_references_test_() ->
 %%%%%%%%%%%%%%%%
 
 parse(S) ->
-    {ok, R} = sourcer_parse:string(S),
+    {ok, R} = sourcer_parse:string(S, #context{}),
     R.
 
 scan(D) ->
-    {ok, L} = sourcer_parse:scan(D),
+    {ok, L, _} = sourcer_scan:string(D),
     [{C, [setelement(2, T, 1)||T<-Ts]} || {C, Ts} <- L].
 
 scan1(D) ->
-    {ok, Ts, _} = erl_scan:string(D),
+    {ok, Ts, _} = erl_scan_local:string(D),
     [setelement(2, T, 1) || T<-Ts].
 
 scan2(S) ->
-    {ok, {_, [Mod0]}} = sourcer_parse:scan(S),
+    {ok, Mod0, _} = sourcer_scan:string(S),
     sourcer_parse:filter_tokens(Mod0).
 
-find_forms(Key, Forms) when is_atom(Key) ->
+find_forms(Key, #{forms:=Forms}) when is_atom(Key) ->
     Fun = fun(X) ->
                   element(1, X) == Key
           end,

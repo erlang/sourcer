@@ -6,6 +6,9 @@
 -compile(export_all).
 -endif.
 
+%% TODO: maybe make this recursive, to be easy to push/pop new stuff?
+%% for example, inside an ifdef.
+
 -record(context, {
                   %% location (path) of current file
                   %% TODO what about working copies (i.e.
