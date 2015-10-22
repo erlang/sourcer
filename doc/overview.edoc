@@ -1,0 +1,30 @@
+@author Vlad Dumitrescu
+
+@doc Sourcer - a source code processor for use in IDEs
+
+Sourcer parses Erlang source code and has the following main differences from erl_parse and friends:
+
+<ul>
+	<li> 
+		no preprocessing is done before the initial lexical scan; tokens are extended to include macros
+	</li>
+	<li> 
+		a different stream of tokens is overlayed, where macros and -includes are expanded; this layer 
+		tracks the original source tokens
+	</li>
+	<li> 
+		the parser is extended to recognize and handle conditionally enabled code; the structure of
+		a module is not a list of forms, but a list of "chunks" guarded by macro expressions
+	</li> 
+	<li> 
+		given a combination of macro values, the module tree can be filtered to provide only the forms 
+		that are available
+	</li>
+	<li>
+		parse trees keep track of the tokens they were created from, so that the exact source input
+		can be recreated
+	</li> 
+</ul>
+
+
+@end

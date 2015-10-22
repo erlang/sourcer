@@ -3,3 +3,5 @@ ebin/
 *.~*
 .eunit/
 deps/
+doc/*
+!doc/overview.edoc
