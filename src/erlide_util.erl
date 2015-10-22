@@ -14,11 +14,15 @@
 
 %% @doc Some utilities used around the code.
 
--module(erlide_scan_util).
+-module(erlide_util).
 
 -export([middle/1]).
 
 middle([]) ->
+    [];
+middle([_]) ->
+    [];
+middle([_,_]) ->
     [];
 middle([_|T]) ->
     lists:reverse(tl(lists:reverse(T))).

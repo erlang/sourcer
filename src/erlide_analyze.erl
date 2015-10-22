@@ -205,6 +205,6 @@ group_forms(Keys, [H|T], Acc) ->
 
 get_arity([{'(',_}|_]=Ts) ->
     {A,_} = erlide_parse:split_at_brace(Ts),
-    length(erlide_parse:split_at_comma(erlide_scan_util:middle(A)));
+    length(erlide_parse:split_at_comma(erlide_util:middle(A)));
 get_arity(_) ->
     -1.

@@ -182,14 +182,14 @@ parse_attribute([{'-', Pos},{atom,_,'endif'}], Comments) ->
 parse_attribute([{'-', Pos},{atom,_,'undef'},{'(', _},Name,{')',_}], Comments) ->
     {undef, Pos#{comments=>Comments}, Name};
 parse_attribute([{'-', Pos},{atom,_,'define'}|Ts], Comments) ->
-    [Name | Args0] = erlide_scan_util:middle(Ts),
+    [Name | Args0] = erlide_util:middle(Ts),
     {Args, Value} = case Args0 of
                         [] ->
                             [];
                         [{'(',_}|_] ->
                             {A,B} = split_at_brace(Args0),
                             {
-                             [hd(X) || X<-split_at_comma(erlide_scan_util:middle(A))],
+                             [hd(X) || X<-split_at_comma(erlide_util:middle(A))],
                              case B of [] -> []; _->tl(B) end
                             };
                         _ ->
@@ -198,27 +198,27 @@ parse_attribute([{'-', Pos},{atom,_,'define'}|Ts], Comments) ->
     Arity = length(Args),
     {define, Pos#{comments=>Comments}, Name, Arity, Args, Value};
 parse_attribute([{'-', Pos},{atom,_,'record'}|Ts], Comments) ->
-    [{atom, _, Name}, {',', _} | Def] = erlide_scan_util:middle(Ts),
+    [{atom, _, Name}, {',', _} | Def] = erlide_util:middle(Ts),
     {record, Pos#{comments=>Comments}, Name, record_def(Def)};
 parse_attribute([{'-', Pos},{atom,_,'type'}|Ts], Comments) ->
     Ts1 = case hd(Ts) of
               {'(',_} ->
-                  erlide_scan_util:middle(Ts);
+                  erlide_util:middle(Ts);
               _ ->
                   Ts
           end,
     {[Name|Args0], Def} = split_at(Ts1, '::'),
-    Args = split_at_comma(erlide_scan_util:middle(Args0)),
+    Args = split_at_comma(erlide_util:middle(Args0)),
     {type, Pos#{comments=>Comments}, Name, Args, Def};
 parse_attribute([{'-', Pos},{atom,_,'opaque'}|Ts], Comments) ->
     Ts1 = case hd(Ts) of
               {'(',_} ->
-                  erlide_scan_util:middle(Ts);
+                  erlide_util:middle(Ts);
               _ ->
                   Ts
           end,
     {[Name|Args0], Def} = split_at(Ts1, '::'),
-    Args = split_at_comma(erlide_scan_util:middle(Args0)),
+    Args = split_at_comma(erlide_util:middle(Args0)),
     {opaque, Pos#{comments=>Comments}, Name, Args, Def};
 parse_attribute([{'-', Pos},{atom,_,'spec'}|Ts], Comments) ->
     {M, F, Sigs} = parse_spec(Ts),
@@ -227,27 +227,27 @@ parse_attribute([{'-', Pos},{atom,_,'callback'}|Ts], Comments) ->
     {_, F, [Sigs]} = parse_spec(Ts),
     {callback, Pos#{comments=>Comments}, F, Sigs};
 parse_attribute([{'-', Pos},{atom,_,'export'}|Ts], Comments) ->
-    Fs = split_at_comma(erlide_scan_util:middle(erlide_scan_util:middle(Ts))),
+    Fs = split_at_comma(erlide_util:middle(erlide_util:middle(Ts))),
     {export, Pos#{comments=>Comments}, Fs};
 parse_attribute([{'-', Pos},{atom,_,'export_type'}|Ts], Comments) ->
-    Fs = split_at_comma(erlide_scan_util:middle(erlide_scan_util:middle(Ts))),
+    Fs = split_at_comma(erlide_util:middle(erlide_util:middle(Ts))),
     {export_type, Pos#{comments=>Comments}, Fs};
 parse_attribute([{'-', Pos},{atom,_,'import'}|Ts], Comments) ->
-    {M, Fs0} = split_at(erlide_scan_util:middle(Ts), ','),
-    Fs = split_at_comma(erlide_scan_util:middle(Fs0)),
+    {M, Fs0} = split_at(erlide_util:middle(Ts), ','),
+    Fs = split_at_comma(erlide_util:middle(Fs0)),
     {import, Pos#{comments=>Comments}, M, Fs};
 parse_attribute([{'-', Pos},{atom,_,'module'},{'(',_},{atom,_,Name}|_], Comments) ->
     {module, Pos#{comments=>Comments}, Name};
 parse_attribute([{'-', Pos},{atom,_,'compile'}|Ts], Comments) ->
-    {compile, Pos#{comments=>Comments}, erlide_scan_util:middle(Ts)};
+    {compile, Pos#{comments=>Comments}, erlide_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,_,'vsn'}|Vsn], Comments) ->
-    {vsn, Pos#{comments=>Comments}, erlide_scan_util:middle(Vsn)};
+    {vsn, Pos#{comments=>Comments}, erlide__util:middle(Vsn)};
 parse_attribute([{'-', Pos},{atom,_,'on_load'}|Ts], Comments) ->
-    {on_load, Pos#{comments=>Comments}, erlide_scan_util:middle(Ts)};
+    {on_load, Pos#{comments=>Comments}, erlide_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,_,'behaviour'}|Ts], Comments) ->
-    {behaviour, Pos#{comments=>Comments}, erlide_scan_util:middle(Ts)};
+    {behaviour, Pos#{comments=>Comments}, erlide_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,_,'behavior'}|Ts], Comments) ->
-    {behaviour, Pos#{comments=>Comments}, erlide_scan_util:middle(Ts)};
+    {behaviour, Pos#{comments=>Comments}, erlide_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,_,'include'},{'(',_},{string,_,Str}|_], Comments) ->
     {include, Pos#{comments=>Comments}, Str};
 parse_attribute([{'-', Pos},{atom,_,'include_lib'},{'(',_},{string,_,Str}|_], Comments) ->
@@ -267,7 +267,7 @@ parse_clauses(Ts) ->
 parse_clause(Ts) ->
     [H |Toks] = Ts,
     {Args0, Rest} = split_at_brace(Toks),
-    Args = split_at_comma(erlide_scan_util:middle(Args0)),
+    Args = split_at_comma(erlide_util:middle(Args0)),
     {Guards0, Body} = split_at_arrow(Rest),
     Guards = case Guards0 of
                  [] ->
@@ -407,7 +407,7 @@ filter_token(E) ->
     end.
 
 record_def(Ts) ->
-    Fields = split_at_comma(erlide_scan_util:middle(Ts)),
+    Fields = split_at_comma(erlide_util:middle(Ts)),
     Fun = fun([{atom,Pos,Name}|TypeDef]) ->
                   Def0 = case TypeDef of
                              [{'=',_}|_] ->
@@ -431,7 +431,7 @@ parse_spec(Ts) ->
     Cls = split_at_semicolon([{'(',1}|Rest]),
     Fun = fun(X) ->
                   {Args0,Return} = split_at_brace(X),
-                  Args = split_at_comma(erlide_scan_util:middle(Args0)),
+                  Args = split_at_comma(erlide_util:middle(Args0)),
                   {Args, tl(Return)}
           end,
     Sigs = lists:map(Fun, Cls),
