@@ -13,7 +13,7 @@
 %%% limitations under the License.
 %%% 
 
--module(erlide_analyze).
+-module(sourcer_analyze).
 
 -export([
          analyze_module/1,
@@ -204,7 +204,7 @@ group_forms(Keys, [H|T], Acc) ->
     group_forms(Keys, T, Acc1).
 
 get_arity([{'(',_}|_]=Ts) ->
-    {A,_} = erlide_parse:split_at_brace(Ts),
-    length(erlide_parse:split_at_comma(erlide_util:middle(A)));
+    {A,_} = sourcer_parse:split_at_brace(Ts),
+    length(sourcer_parse:split_at_comma(sourcer_util:middle(A)));
 get_arity(_) ->
     -1.

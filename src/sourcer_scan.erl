@@ -13,7 +13,7 @@
 %%% limitations under the License.
 %%% 
 
--module(erlide_scan).
+-module(sourcer_scan).
 
 -export([string/1,
          string/2,
@@ -23,7 +23,7 @@
          filter_comments/1,
          filter_ws_comments/1]).
  
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 string(String) ->
     string(String, {0, 1}).

@@ -14,7 +14,7 @@
 
 %% @doc Some utilities used around the code.
 
--module(erlide_util).
+-module(sourcer_util).
 
 -export([middle/1]).
 

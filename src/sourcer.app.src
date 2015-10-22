@@ -1,4 +1,4 @@
-{application, erlide_parser,
+{application, sourcer,
  [
   {description, "A preprocessor+scanner+parser for Erlang that keeps track of the exact source code."},
   {vsn, "0.1"},

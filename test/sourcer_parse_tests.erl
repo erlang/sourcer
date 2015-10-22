@@ -1,10 +1,10 @@
--module(erlide_parse_tests).
+-module(sourcer_parse_tests).
 
 -include_lib("eunit/include/eunit.hrl").
--include("../src/erlide_parse.hrl").
+-include("../src/sourcer_parse.hrl").
 
 fix_macro_tokens_test_() ->
-	{_, Y} = ok(erlide_parse:scan("?a,?B")),
+	{_, Y} = ok(sourcer_parse:scan("?a,?B")),
 	X = hd(Y),
     [
      ?_assertMatch([
@@ -12,19 +12,19 @@ fix_macro_tokens_test_() ->
                     {',',_},
                     {macro,#{line:=0,column:=4,text:="?B"},'B'}
                    ],
-                   erlide_parse:fix_macro_tokens(X))
+                   sourcer_parse:fix_macro_tokens(X))
      ].
 
 split_at_dot_test_() ->
     [
      ?_assertMatch([[{atom,_,a},{',',_},{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_dot(scan("a,b,c"))),
+                   sourcer_parse:split_at_dot(scan("a,b,c"))),
      ?_assertMatch([[{atom,_,a}],[{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_dot(scan("a. b,c"))),
+                   sourcer_parse:split_at_dot(scan("a. b,c"))),
      ?_assertMatch([[{atom,_,a}],[{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_dot(scan("a. b,c."))),
+                   sourcer_parse:split_at_dot(scan("a. b,c."))),
      ?_assertMatch([],
-                   erlide_parse:split_at_dot(scan("")))
+                   sourcer_parse:split_at_dot(scan("")))
     ].
 
 group_top_comments_test_() ->
@@ -32,42 +32,42 @@ group_top_comments_test_() ->
 	 ?_assertMatch([{comments,_,["a","b"],1},
 					{comments,_,["c"],2},
 					{atom,_,hello}],
-				   erlide_parse:group_top_comments(scan("%a\n%b\n%%c\nhello"))),
+				   sourcer_parse:group_top_comments(scan("%a\n%b\n%%c\nhello"))),
 	 ?_assertMatch([{comments,_,["a"],1},
 					{comments,_,["b"],1},
 					{atom,_,hello}],
-				   erlide_parse:group_top_comments(scan("%a\n\n%b\nhello")))
+				   sourcer_parse:group_top_comments(scan("%a\n\n%b\nhello")))
 	].
 
 split_at_semicolon_name_test_() ->
     [
      ?_assertMatch([[{atom,_,a},{',',_},{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_semicolon_name(scan("a,b,c"))),
+                   sourcer_parse:split_at_semicolon_name(scan("a,b,c"))),
      ?_assertMatch([[{atom,_,a},{';',_},{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_semicolon_name(scan("a;b,c"))),
+                   sourcer_parse:split_at_semicolon_name(scan("a;b,c"))),
      ?_assertMatch([[{atom,_,a},{';',_},{atom,_,a},{',',_},{atom,_,b}]],
-                   erlide_parse:split_at_semicolon_name(scan("a;a,b"))),
+                   sourcer_parse:split_at_semicolon_name(scan("a;a,b"))),
      ?_assertMatch([[{atom,_,a},{'(',_},{atom,_,b},{')',_}],
                     [{atom,_,a},{'(',_},{atom,_,e},{')',_}]],
-                   erlide_parse:split_at_semicolon_name(scan("a(b);a(e)"))),
+                   sourcer_parse:split_at_semicolon_name(scan("a(b);a(e)"))),
      ?_assertMatch([[{atom,_,a},{'(',_},{atom,_,b},{')',_},{';',_},
                      {atom,_,c},{'(',_},{atom,_,d},{')',_}]],
-                   erlide_parse:split_at_semicolon_name(scan("a(b);c(d)"))),
+                   sourcer_parse:split_at_semicolon_name(scan("a(b);c(d)"))),
      ?_assertMatch([],
-                   erlide_parse:split_at_semicolon_name([]))
+                   sourcer_parse:split_at_semicolon_name([]))
     ].
 
 split_at_semicolon_test_() ->
     [
      ?_assertMatch([[{atom,_,a},{',',_},{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_semicolon(scan("a,b,c"))),
+                   sourcer_parse:split_at_semicolon(scan("a,b,c"))),
      ?_assertMatch([[{atom,_,a},{';',_},{atom,_,b},{',',_},{atom,_,c}]],
-                   erlide_parse:split_at_semicolon(scan("a;b,c"))),
+                   sourcer_parse:split_at_semicolon(scan("a;b,c"))),
      ?_assertMatch([[{'(',_},{atom,_,b},{')',_},{atom,_,zz}],
                     [{'(',_},{atom,_,e},{')',_},{atom,_,xx}]],
-                   erlide_parse:split_at_semicolon(scan("(b)zz;(e)xx"))),
+                   sourcer_parse:split_at_semicolon(scan("(b)zz;(e)xx"))),
      ?_assertMatch([],
-                   erlide_parse:split_at_semicolon([]))
+                   sourcer_parse:split_at_semicolon([]))
     ].
 
 split_at_comma_test_() ->
@@ -75,41 +75,41 @@ split_at_comma_test_() ->
      ?_assertMatch([[{atom,_,a}],
                     [{atom,_,b},{white_space,_," "},{atom,_,c}],
                     [{atom,_,d}]],
-                   erlide_parse:split_at_comma(scan("a,b c,d"))),
+                   sourcer_parse:split_at_comma(scan("a,b c,d"))),
      ?_assertMatch([[{atom,_,a}],
                     [{'(',_},{atom,_,b},{white_space,_," "},{atom,_,c},{',',_},{atom,_,d},{')',_}],
                     [{atom,_,e},{white_space,_," "},{atom,_,f}]],
-                   erlide_parse:split_at_comma(scan("a,(b c,d),e f"))),
+                   sourcer_parse:split_at_comma(scan("a,(b c,d),e f"))),
      ?_assertMatch([[{atom,_,a}],
                     [{'[',_},{atom,_,b},{white_space,_," "},{atom,_,c},{',',_},{atom,_,d},{']',_}],
                     [{atom,_,e},{white_space,_," "},{atom,_,f}]],
-                   erlide_parse:split_at_comma(scan("a,[b c,d],e f"))),
+                   sourcer_parse:split_at_comma(scan("a,[b c,d],e f"))),
      ?_assertMatch([],
-                   erlide_parse:split_at_comma([]))
+                   sourcer_parse:split_at_comma([]))
     ].
 
 split_at_brace_test_() ->
     [
      ?_assertMatch({[],
                     [{atom,_,a},{',',_},{atom,_,b},{white_space,_," "},{atom,_,c}]},
-                   erlide_parse:split_at_brace(scan("a,b c"))),
+                   sourcer_parse:split_at_brace(scan("a,b c"))),
      ?_assertMatch({[{'(',_},{')',_}],
                     [{'->',_},{atom,_,a}]},
-                   erlide_parse:split_at_brace(scan("()->a"))),
+                   sourcer_parse:split_at_brace(scan("()->a"))),
      ?_assertMatch({[{'(',_},{atom,_,a},{white_space,_," "},{atom,_,b},{')',_}],
                     []},
-                   erlide_parse:split_at_brace(scan("(a b)"))),
+                   sourcer_parse:split_at_brace(scan("(a b)"))),
      ?_assertMatch({[{'(',_},{atom,_,a},{white_space,_," "},{atom,_,b},{')',_}],
                     [{atom,_,c},{white_space,_," "},{atom,_,d}]},
-                   erlide_parse:split_at_brace(scan("(a b)c d"))),
+                   sourcer_parse:split_at_brace(scan("(a b)c d"))),
      ?_assertMatch({[{'(',_},{atom,_,a},{'(',_},{atom,_,b},{white_space,_," "},{atom,_,c},{')',_},{atom,_,d},{')',_}],
                     [{atom,_,e}]},
-                   erlide_parse:split_at_brace(scan("(a(b c)d)e"))),
+                   sourcer_parse:split_at_brace(scan("(a(b c)d)e"))),
      ?_assertMatch({[{'(',_},{atom,_,a},{',',_},{'[',_},{atom,_,b},{',',_},{atom,_,c},{']',_},{',',_},{atom,_,d},{')',_}],
                     [{atom,_,e}]},
-                   erlide_parse:split_at_brace(scan("(a,[b,c],d)e"))),
+                   sourcer_parse:split_at_brace(scan("(a,[b,c],d)e"))),
      ?_assertMatch({[], []},
-                   erlide_parse:split_at_brace([]))
+                   sourcer_parse:split_at_brace([]))
     ].
 
 convert_attributes_test_() ->
@@ -132,7 +132,7 @@ convert_attributes_test_() ->
                      {dot,#{line:=2,column:=6,text:=".",offset:= 12}}
                     ],
                     13
-                   }, erlide_parse:convert_attributes(Toks))
+                   }, sourcer_parse:convert_attributes(Toks))
     ].
 
 filter_tokens_test_() ->
@@ -150,29 +150,29 @@ filter_tokens_test_() ->
 
     [
      ?_assertMatch([{atom,_,foo},{'(',_},{')',_},{'->',_},{atom,_,ok},{dot,_}],
-                   erlide_parse:filter_tokens(Input))
+                   sourcer_parse:filter_tokens(Input))
     ].
 
 parse_string_test_() ->
     [
      ?_assertMatch({clause, _, [], [], [{atom,_,a}]},
-                   erlide_parse:parse_clause(scan("foo()->a"))),
+                   sourcer_parse:parse_clause(scan("foo()->a"))),
      ?_assertMatch({clause,_,
                     [[{atom,_,x}],[{atom,_,y}]],
                     [],
                     [{atom,_,a},{',',_},{atom,_,b}]},
-                   erlide_parse:parse_clause(scan("foo(x,y)->a,b"))),
+                   sourcer_parse:parse_clause(scan("foo(x,y)->a,b"))),
      ?_assertMatch({[{function,_,foo,0,
                       [{clause,_,[],[],[{atom,_,ok}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("foo()->ok. "))),
+                   ok(sourcer_parse:string("foo()->ok. "))),
      ?_assertMatch({[{function,_,foo,0,
                       [{clause,_,
                         [],
                         [{atom,_,x},{';',_},{atom,_,y},{',',_},{atom,_,z}],
                         [{atom,_,ok},{';',_},{atom,_,ok}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("foo() when x;y,z->ok;ok. "))),
+                   ok(sourcer_parse:string("foo() when x;y,z->ok;ok. "))),
      ?_assertMatch({[{function,_,foo,1,
                       [{clause,_,
                         [[{atom,_,x}]],
@@ -183,47 +183,47 @@ parse_string_test_() ->
                         [],
                         [{atom,_,m}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("foo(x)->ok;foo(y)->m. "))),
+                   ok(sourcer_parse:string("foo(x)->ok;foo(y)->m. "))),
      ?_assertMatch({[{record,_,z,[]}],
                     #context{}},
-                   ok(erlide_parse:string("-record(z,{}). "))),
+                   ok(sourcer_parse:string("-record(z,{}). "))),
      ?_assertMatch({[{record,_,z,
                       [{field,_,a,[],[]},
                        {field,_,b,[],[{atom,_,i}]},
                        {field,_,c,[{atom,_,d}],[]},
                        {field,_,e,[{atom,_,f}],[{atom,_,g}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("-record(z,{a,b::i,c=d,e=f::g}). "))),
+                   ok(sourcer_parse:string("-record(z,{a,b::i,c=d,e=f::g}). "))),
      ?_assertMatch({[{type,_,{atom,_,i},
                       [],
                       [{atom,_,g},{'(',_},{')',_}]}],
                     #context{}},
-                   ok(erlide_parse:string("-type i()::g(). "))),
+                   ok(sourcer_parse:string("-type i()::g(). "))),
      ?_assertMatch({[{type,_,{atom,_,i},
                       [[{var,_,'X'}]],
                       [{'[',_},{var,_,'X'},{']',_}]}],
                     #context{}},
-                   ok(erlide_parse:string("-type i(X)::[X]. "))),
+                   ok(sourcer_parse:string("-type i(X)::[X]. "))),
      ?_assertMatch({[{opaque,_,{atom,_,i},
                       [],
                       [{atom,_,g},{'(',_},{')',_}]}],
                     #context{}},
-                   ok(erlide_parse:string("-opaque i()::g(). "))),
+                   ok(sourcer_parse:string("-opaque i()::g(). "))),
      ?_assertMatch({[{export, _, [[{atom,_,a},{'/',_},{integer,_,2}],
                                   [{atom,_,b},{'/',_},{integer,_,3}]]}],
                     #context{}},
-                   ok(erlide_parse:string("-export([a/2, b/3]). "))),
+                   ok(sourcer_parse:string("-export([a/2, b/3]). "))),
      ?_assertMatch({[{import,_,[{atom,_,ss}],
                       [[{atom,_,a},{'/',_},{integer,_,2}],
                        [{atom,_,b},{'/',_},{integer,_,3}]]}],
                     #context{}},
-                   ok(erlide_parse:string("-import(ss,[a/2, b/3]). "))),
+                   ok(sourcer_parse:string("-import(ss,[a/2, b/3]). "))),
      ?_assertMatch({[{spec,_,'$this$',{atom,_,f},
                       [{[[{atom,_,a}],
                          [{atom,_,b}]],
                         [{atom,_,c}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("-spec f(a,b)->c. "))),
+                   ok(sourcer_parse:string("-spec f(a,b)->c. "))),
      ?_assertMatch({[{spec,_,'$this$',{atom,_,f},
                       [{[[{atom,_,a}],
                          [{atom,_,b}]],
@@ -232,13 +232,13 @@ parse_string_test_() ->
                          [{atom,_,e}]],
                         [{atom,_,f}]}]}],
                     #context{}},
-                   ok(erlide_parse:string("-spec f(a,b)->c;(d,e)->f. "))),
+                   ok(sourcer_parse:string("-spec f(a,b)->c;(d,e)->f. "))),
      ?_assertMatch({[{callback,_,{atom,_,f},
                       {[[{atom,_,a}],[{atom,_,b}]],
                        [{atom,_,c}]}}
                     ],
                     #context{}},
-                   ok(erlide_parse:string("-callback f(a,b)->c. "))),
+                   ok(sourcer_parse:string("-callback f(a,b)->c. "))),
      ?_assertMatch({[{module,#{comments:=[{comments,_,[" module info"],3}]},x},
                      {spec,#{comments:=[{comments,_,["fun1"],1}]},
                       '$this$',{atom,_,fun1},
@@ -255,7 +255,7 @@ parse_string_test_() ->
                          "fun1() -> ok.\n"
                         )),
      ?_assertMatch({[],#context{}},
-                   ok(erlide_parse:string("")))
+                   ok(sourcer_parse:string("")))
     ].
 
 parse_context_test_() ->
@@ -295,47 +295,47 @@ parse_context_test_() ->
 is_active_context_test_() ->
     [
      ?_assertEqual(true,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([x]),
                               active=[]
                              })),
      ?_assertEqual(true,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([x]),
                               active=[x]
                              })),
      ?_assertEqual(true,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([{'not', x}]),
                               active=[]
                              })),
      ?_assertEqual(false,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([{'not', x}]),
                               active=[x]
                              })),
      ?_assertEqual(false,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([x]),
                               active=[{'not', x}]
                              })),
      ?_assertEqual(false,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([]),
                               active=[x]
                              })),
      ?_assertEqual(true,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([]),
                               active=[{'not',x}]
                              })),
      ?_assertEqual(false,
-                   erlide_parse:is_active_context(
+                   sourcer_parse:is_active_context(
                      #context{defines=sets:from_list([x]),
                               active=[{'not',x},x]
                              })),
      ?_assertEqual(true,
-                   erlide_parse:is_active_context(#context{}))
+                   sourcer_parse:is_active_context(#context{}))
     ].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -345,7 +345,7 @@ scan(D) ->
     Ts.
 
 parse(S) ->
-    {F, C} = ok(erlide_parse:string(S)),
+    {F, C} = ok(sourcer_parse:string(S)),
     {F, ctxt(C)}.
 
 ctxt(#context{defines=D, active=A}) ->

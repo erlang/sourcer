@@ -1,10 +1,8 @@
-# erlide_parser 
-
-_(suggestions for better names are welcome)_
+# Sourcer 
 
 An Erlang preprocessor+scanner+parser tailored for use in an IDE, keeping track of the exact source code in the files. It was originally developed as part of [erlide](https://github.com/erlide/erlide), but it is easier to handle and to get feedback if it is a separate project.
 
-[![Build Status](https://travis-ci.org/erlide/erlide_parser.svg?branch=master)](https://travis-ci.org/erlide/erlide_parser) [![Coverage Status](https://coveralls.io/repos/erlide/erlide_parser/badge.svg?branch=master&service=github)](https://coveralls.io/github/erlide/erlide_parser?branch=master)
+[![Build Status](https://travis-ci.org/erlide/sourcer.svg?branch=master)](https://travis-ci.org/erlide/sourcer) [![Coverage Status](https://coveralls.io/repos/erlide/sourcer/badge.svg?branch=master&service=github)](https://coveralls.io/github/erlide/sourcer?branch=master)
 
 ## Rationale
 

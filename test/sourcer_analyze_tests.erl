@@ -1,4 +1,4 @@
--module(erlide_analyze_tests).
+-module(sourcer_analyze_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
@@ -42,7 +42,7 @@ find_forms_test_() ->
                     {include,[{include,_,"bar.hrl"}]},
                     {function,[{function,_,fow,1,
                                 [{clause,_,[[{var,_,'A'}]],[],[{var,_,'A'}]}]}]}],
-                   erlide_analyze:group_forms(Mod))
+                   sourcer_analyze:group_forms(Mod))
     ].
 
 analyze_references_test_() ->
@@ -52,27 +52,27 @@ analyze_references_test_() ->
                     {functionref,#{line:=0,column:=4,offset:=3,length:=3},{function_id,a,b,2}},
                     {recordref,#{line:=0,column:=16,offset:=15,length:=2},r},
                     {functionref,#{line:=0,column:=22,offset:=21,length:=4},{function_id,'M',f,0}}],
-                   erlide_analyze:analyze_references(scan2("3, a:b(3,?Z4), #r{}, ?M:f()"))),
+                   sourcer_analyze:analyze_references(scan2("3, a:b(3,?Z4), #r{}, ?M:f()"))),
      ?_assertMatch([{macroref,#{line:=0,column:=2,offset:=1,length:=4},'REC'},
                     {recordref,#{line:=0,column:=1,offset:=0,length:=5},'REC'},
                     {functionref,#{line:=0,column:=10,offset:=9,length:=2},{function_id,'$this$',ff,3}},
                     {functionref,#{line:=0,column:=13,offset:=12,length:=1},{function_id,'$this$',t,1}}],
-                   erlide_analyze:analyze_references(scan2("#?REC.f, ff(t(4),5,6)"))),
+                   sourcer_analyze:analyze_references(scan2("#?REC.f, ff(t(4),5,6)"))),
      ?_assertMatch([{functionref,#{line:=0,column:=8,offset:=7,length:=2},{function_id,'$this$',ff,0}},
                     {functionref,#{line:=0,column:=14,offset:=13,length:=2},{function_id,'$this$',gg,1}}],
-                   erlide_analyze:analyze_references(scan2("2, ff, ff(), gg(1)"))),
+                   sourcer_analyze:analyze_references(scan2("2, ff, ff(), gg(1)"))),
      ?_assertMatch([],
-                   erlide_analyze:analyze_references(scan2("a, 4")))
+                   sourcer_analyze:analyze_references(scan2("a, 4")))
      ].
 
 %%%%%%%%%%%%%%%%
 
 parse(S) ->
-    {ok, R} = erlide_parse:string(S),
+    {ok, R} = sourcer_parse:string(S),
     R.
 
 scan(D) ->
-    {ok, L} = erlide_parse:scan(D),
+    {ok, L} = sourcer_parse:scan(D),
     [{C, [setelement(2, T, 1)||T<-Ts]} || {C, Ts} <- L].
 
 scan1(D) ->
@@ -80,8 +80,8 @@ scan1(D) ->
     [setelement(2, T, 1) || T<-Ts].
 
 scan2(S) ->
-    {ok, {_, [Mod0]}} = erlide_parse:scan(S),
-    erlide_parse:filter_tokens(Mod0).
+    {ok, {_, [Mod0]}} = sourcer_parse:scan(S),
+    sourcer_parse:filter_tokens(Mod0).
 
 find_forms(Key, Forms) when is_atom(Key) ->
     Fun = fun(X) ->
