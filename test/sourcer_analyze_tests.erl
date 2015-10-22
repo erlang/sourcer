@@ -63,7 +63,7 @@ analyze_references_test_() ->
                    sourcer_analyze:analyze_references(scan2("2, ff, ff(), gg(1)"))),
      ?_assertMatch([],
                    sourcer_analyze:analyze_references(scan2("a, 4")))
-     ].
+    ].
 
 %%%%%%%%%%%%%%%%
 

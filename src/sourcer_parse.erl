@@ -3,15 +3,15 @@
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
 %%% You may obtain a copy of the License at
-%%% 
+%%%
 %%%     http://www.apache.org/licenses/LICENSE-2.0
-%%% 
+%%%
 %%% Unless required by applicable law or agreed to in writing, software
 %%% distributed under the License is distributed on an "AS IS" BASIS,
 %%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
-%%% 
+%%%
 
 -module(sourcer_parse).
 
@@ -27,13 +27,14 @@
 
 %-spec scan(string()) -> {ok, {[[token()]], [{[token()], [token()]}]}}.
 scan(D) ->
+    %% TODO why not call sourcer_scan?
     case erl_scan_local:string(D, {0,1}, [return, text]) of
         {ok, Toks, _} ->
             {Toks1, _} = convert_attributes(Toks),
-			Toks2 = split_at_dot(fix_macro_tokens(Toks1)),
-		    Toks3 = lists:delete([], [group_top_comments(F) || F<-Toks2]),
-			Filtered = filter_whitespace_comments(Toks3),
-			{ok, {Toks2, Filtered}};
+            Toks2 = split_at_dot(fix_macro_tokens(Toks1)),
+            Toks3 = lists:delete([], [group_top_comments(F) || F<-Toks2]),
+            Filtered = filter_whitespace_comments(Toks3),
+            {ok, {Toks2, Filtered}};
         Err ->
             Err
     end.
@@ -135,8 +136,8 @@ do_parse_form(Ts, Context, Comments) ->
             Attr = parse_attribute(Ts, lists:reverse(Comments)),
             NewContext = get_context(Attr, Context),
             {Attr, NewContext};
-		comments ->
-			do_parse_form(tl(Ts), Context, [hd(Ts)|Comments]);
+        comments ->
+            do_parse_form(tl(Ts), Context, [hd(Ts)|Comments]);
         _ ->
             {parse_unknown(Ts), Context}
     end.
@@ -156,7 +157,7 @@ get_context({'else', _}, #context{active=[Crt|Active]}=Ctx) ->
               {'not', X} ->
                   X;
               X ->
-                {'not', X}
+                  {'not', X}
           end,
     Ctx#context{active=[New|Active]};
 get_context({'endif', _}, #context{active=[_|Active]}=Ctx) ->
@@ -304,7 +305,7 @@ split_at_semicolon_name([], _, R, []) ->
 split_at_semicolon_name([], _, Acc, Crt) ->
     lists:reverse(Acc, [lists:reverse(Crt)]);
 split_at_semicolon_name([{';', _}, {atom, _, Name}=H1, {'(', _}=H2|T],
-                   Name, Acc, Crt) ->
+                        Name, Acc, Crt) ->
     split_at_semicolon_name([H1, H2|T], Name, [lists:reverse(Crt)|Acc], []);
 split_at_semicolon_name([H|T], Name, Acc, Crt) ->
     split_at_semicolon_name(T, Name, Acc, [H|Crt]).

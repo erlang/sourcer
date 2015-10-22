@@ -4,8 +4,8 @@
 -include("../src/sourcer_parse.hrl").
 
 fix_macro_tokens_test_() ->
-	{_, Y} = ok(sourcer_parse:scan("?a,?B")),
-	X = hd(Y),
+    {_, Y} = ok(sourcer_parse:scan("?a,?B")),
+    X = hd(Y),
     [
      ?_assertMatch([
                     {macro,#{line:=0,column:=1,text:="?a"},'a'},
@@ -13,7 +13,7 @@ fix_macro_tokens_test_() ->
                     {macro,#{line:=0,column:=4,text:="?B"},'B'}
                    ],
                    sourcer_parse:fix_macro_tokens(X))
-     ].
+    ].
 
 split_at_dot_test_() ->
     [
@@ -28,16 +28,16 @@ split_at_dot_test_() ->
     ].
 
 group_top_comments_test_() ->
-	[
-	 ?_assertMatch([{comments,_,["a","b"],1},
-					{comments,_,["c"],2},
-					{atom,_,hello}],
-				   sourcer_parse:group_top_comments(scan("%a\n%b\n%%c\nhello"))),
-	 ?_assertMatch([{comments,_,["a"],1},
-					{comments,_,["b"],1},
-					{atom,_,hello}],
-				   sourcer_parse:group_top_comments(scan("%a\n\n%b\nhello")))
-	].
+    [
+     ?_assertMatch([{comments,_,["a","b"],1},
+                    {comments,_,["c"],2},
+                    {atom,_,hello}],
+                   sourcer_parse:group_top_comments(scan("%a\n%b\n%%c\nhello"))),
+     ?_assertMatch([{comments,_,["a"],1},
+                    {comments,_,["b"],1},
+                    {atom,_,hello}],
+                   sourcer_parse:group_top_comments(scan("%a\n\n%b\nhello")))
+    ].
 
 split_at_semicolon_name_test_() ->
     [
