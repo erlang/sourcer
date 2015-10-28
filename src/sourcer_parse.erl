@@ -60,7 +60,7 @@ extract_top_comments(Toks) ->
 
 extract_top_comments([{comment, _}=C|Toks], Acc) ->
     extract_top_comments(Toks, [C|Acc]);
-extract_top_comments([{white_space, _}=C|Toks], Acc) ->
+extract_top_comments([{white_space, _}|Toks], Acc) ->
     extract_top_comments(Toks, Acc);
 extract_top_comments(Toks, Acc) ->
     {lists:reverse(Acc), Toks}.
