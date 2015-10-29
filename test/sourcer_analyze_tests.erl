@@ -2,6 +2,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_parse.hrl").
+-include("sourcer_analyze.hrl").
 
 analyze_module_test_() ->
     {Mod, _} = parse(""
@@ -24,7 +25,10 @@ analyze_module_test_() ->
                        [[{var,#{value:='A'}}],[{'[',_},{var,#{value:='X'}},{'|',_},{var,#{value:='Y'}},{']',_}]],
                        [],
                        [{'{',_},{var,#{value:='X'}},{',',_},{var,#{value:='A'}},{'+',_},{var,#{value:='Y'}},{'}',_}]}]}],
-                   find_forms(function, Mod))
+                   find_forms(function, Mod)),
+     %% TODO match something relevant
+     ?_assertMatch(#module{},
+                   sourcer_analyze:analyze_module(Mod))
     ].
 
 find_forms_test_() ->
