@@ -1,14 +1,18 @@
 # Sourcer
 
-An Erlang scanner+parser tailored for use in an IDE, keeping track of the exact source code in the files. It was originally developed as part of [erlide](https://github.com/erlide/erlide), but it is easier to handle and to get feedback if it is a separate project.
+Sourcer is an Erlang scanner+parser tailored for use in tools that handle source code (like IDEs and refactoring tools), keeping track of the exact source code in the files and allowing for incomplete and malformed code. It was originally developed as part of [erlide](http://erlide.org), but it is easier to handle and to get feedback if it is a separate project. As a matter of fact, I discovered many bugs, thinkos and other problems just by looking at the code as an independent entity.
 
 [![Build Status](https://travis-ci.org/erlide/sourcer.svg?branch=master)](https://travis-ci.org/erlide/sourcer) [![Coverage Status](https://coveralls.io/repos/erlide/sourcer/badge.svg?branch=master&service=github)](https://coveralls.io/github/erlide/sourcer?branch=master)
+
+*Note:* the current status is still very alpha. I hope to get feedback from any interested party and important changes will almost certainly happen to both implementation and API. 
 
 ## Rationale
 
 The normal tools for processing source code are aiming to support the compiler and thus are lossy: information that is uninteresting to the compiler is dropped. When supporting editors, cross-referencing tools and other tools, we find ourselves needing to access all the information about the source code.
 
 For example, if sections of a module are conditionally compiled and I am searching for all places where a certain function is called (maybe to rename it), I want to look even into the sections that are invisible to the regular parser because of the values of the currently defined macros. When looking at the resulting list of references, they could be annotated with the boolean macro expression deciding whether they are visible or not to the compiler.
+
+Similarly, while I am editing a file, for example starting to enter a literal string in the middle of the file, I don't want the rest of the file to get scanned as part of that string until the ending quote is entered.
 
 Having to keep an implementation of these tools parallel with the OTP ones is not easy, but the kind of functionality we are after can't be integrated into the OTP parser tools either, so we have no other option.
 
@@ -26,7 +30,7 @@ Having to keep an implementation of these tools parallel with the OTP ones is no
 * The tools must be able to support Erlang code that targets even older OTP versions than the latest. I think the customary (current + 2 older versions) policy is a good decision. This doesn't mean that it must run on older versions, but it must be able to correctly parse older code. I think that it can be required to run on the latest OTP version, thus being able to use all current features, because the kind of tools that would use this parser run usually on the developer's desktop, not on live systems.
 * The APIs for the tools and the syntax tree should follow as much as possible the ones for the corresponding OTP alternatives.
 * The token location information should include even the offset (in characters) from the beginning of the file.
-* Module and function comments should be available from the respective nodes in the parse tree. Likewise, function specs.
+* Module and function comments should be available from the respective nodes in the parse tree. Likewise, function specs should be linked from the function definition.
 
 * It would be cool if even parse transforms could be handled while keeping all connections to the original code, but that is probably for future development.
 * If possible, parsing should be incremental: a change takes into consideration the previous parse tree, so that for example a string with an unclosed quote doesn't make the rest of the file appear as being part of the string.
