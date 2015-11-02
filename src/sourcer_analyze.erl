@@ -34,7 +34,7 @@
 %% XXX structure around ifdefs!?
 
 %% Gather the relevant information about a module, from each form.
--spec analyze_module([form()]) -> #module{}.
+-spec analyze_module(#{}) -> #module{}.
 analyze_module(Mod) ->
     Forms = group_forms(Mod),
 
@@ -160,7 +160,7 @@ group_forms(Keys, [H|T], Acc) ->
     group_forms(Keys, T, Acc1).
 
 get_arity([{'(',_}|_]=Ts) ->
-    {A,_} = sourcer_parse:split_at_brace(Ts),
-    length(sourcer_parse:split_at_comma(sourcer_util:middle(A)));
+    {A,_} = sourcer_util:split_at_brace(Ts),
+    length(sourcer_util:split_at_comma(sourcer_util:middle(A)));
 get_arity(_) ->
     -1.

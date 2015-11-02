@@ -16,7 +16,12 @@
 
 -module(sourcer_util).
 
--export([middle/1]).
+-export([
+         middle/1,
+         split_at_brace/1,
+         split_at_comma/1,
+         filter_tokens/1
+        ]).
 
 middle([]) ->
     [];
@@ -26,3 +31,70 @@ middle([_,_]) ->
     [];
 middle([_|T]) ->
     lists:reverse(tl(lists:reverse(T))).
+
+%% Split L at the first matching brace, keeping track of brace levels.
+%% We assume that the start brace is the first element of the list.
+split_at_brace([]) ->
+    {[], []};
+split_at_brace([H|T]=L) ->
+    case token_pair(element(1, H)) of
+        none ->
+            {[], L};
+        End ->
+            split_at_brace(T, End, [H])
+    end.
+
+split_at_brace([], _, Acc) ->
+    {lists:reverse(Acc), []};
+split_at_brace([{End,_}=H|T], End, Acc) ->
+    {lists:reverse([H|Acc]), T};
+split_at_brace([H|T], End, Acc) ->
+    case token_pair(element(1, H)) of
+        none ->
+            split_at_brace(T, End, [H|Acc]);
+        Other ->
+            {L1, L2} = split_at_brace(T, Other, [H]),
+            split_at_brace(L2, End, lists:reverse(L1)++Acc)
+    end.
+
+%% Split token list at top-level commas (not included in result),
+%% while keeping track of brace levels.
+split_at_comma([])->
+    [];
+split_at_comma(L)->
+    split_at_comma(L, [], []).
+
+split_at_comma([], Acc, Crt) ->
+    lists:reverse([lists:reverse(Crt) | Acc]);
+split_at_comma([H|T], Acc, Crt) when element(1, H)==',' ->
+    split_at_comma(T, [lists:reverse(Crt)|Acc], []);
+split_at_comma([H|T], Acc, Crt) ->
+    case token_pair(element(1, H)) of
+        none ->
+            split_at_comma(T, Acc, [H|Crt]);
+        End ->
+            {L1, L2} = split_at_brace(T, End, [H]),
+            split_at_comma(L2, Acc, lists:reverse(L1)++Crt)
+    end.
+
+token_pair('(') ->
+    ')';
+token_pair('[') ->
+    ']';
+token_pair('{') ->
+    '}';
+token_pair('<<') ->
+    '>>';
+token_pair(_) ->
+    none.
+
+filter_tokens(Toks) ->
+    lists:filter(fun filter_token/1, Toks).
+
+filter_token({white_space, _}) ->
+    false;
+filter_token({comment, _}) ->
+    false;
+filter_token(_) ->
+    true.
+

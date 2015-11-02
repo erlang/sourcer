@@ -2,7 +2,7 @@
 -define(TEST, true).
 -endif.
 
--ifdef(TEST).
--compile(export_all).
--endif.
+%% -ifdef(TEST).
+%% -compile(export_all).
+%% -endif.
 

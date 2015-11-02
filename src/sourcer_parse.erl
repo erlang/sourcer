@@ -43,7 +43,7 @@ parse_forms(Toks, Context) ->
 %% keep track of macro context
 parse_form(Ts, Context) ->
     {TopComments, Ts1} = extract_top_comments(Ts),
-    Ts2 = filter_tokens(Ts1),
+    Ts2 = sourcer_util:filter_tokens(Ts1),
     {Form, Ctx} = do_parse_form(Ts2, Context, []),
     Form2 = update_attributes(Form,
                               #{active=>is_active_context(Context),
@@ -169,9 +169,9 @@ parse_attribute([{'-', Pos},{atom,#{value:='define'}}|Ts], Comments) ->
                         [] ->
                             [];
                         [{'(',_}|_] ->
-                            {A,B} = split_at_brace(Args0),
+                            {A,B} = sourcer_util:split_at_brace(Args0),
                             {
-                             [hd(X) || X<-split_at_comma(sourcer_util:middle(A))],
+                             [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
                              case B of [] -> []; _->tl(B) end
                             };
                         _ ->
@@ -190,7 +190,7 @@ parse_attribute([{'-', Pos},{atom,#{value:='type'}}|Ts], Comments) ->
                   Ts
           end,
     {[Name|Args0], Def} = split_at(Ts1, '::'),
-    Args = split_at_comma(sourcer_util:middle(Args0)),
+    Args = sourcer_util:split_at_comma(sourcer_util:middle(Args0)),
     {type, Pos#{comments=>Comments}, Name, Args, Def};
 parse_attribute([{'-', Pos},{atom,#{value:='opaque'}}|Ts], Comments) ->
     Ts1 = case hd(Ts) of
@@ -200,7 +200,7 @@ parse_attribute([{'-', Pos},{atom,#{value:='opaque'}}|Ts], Comments) ->
                   Ts
           end,
     {[Name|Args0], Def} = split_at(Ts1, '::'),
-    Args = split_at_comma(sourcer_util:middle(Args0)),
+    Args = sourcer_util:split_at_comma(sourcer_util:middle(Args0)),
     {opaque, Pos#{comments=>Comments}, Name, Args, Def};
 parse_attribute([{'-', Pos},{atom,#{value:='spec'}}|Ts], Comments) ->
     {M, F, Sigs} = parse_spec(Ts),
@@ -209,21 +209,21 @@ parse_attribute([{'-', Pos},{atom,#{value:='callback'}}|Ts], Comments) ->
     {_, F, [Sigs]} = parse_spec(Ts),
     {callback, Pos#{comments=>Comments}, F, Sigs};
 parse_attribute([{'-', Pos},{atom,#{value:='export'}}|Ts], Comments) ->
-    Fs = split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
+    Fs = sourcer_util:split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
     {export, Pos#{comments=>Comments}, Fs};
 parse_attribute([{'-', Pos},{atom,#{value:='export_type'}}|Ts], Comments) ->
-    Fs = split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
+    Fs = sourcer_util:split_at_comma(sourcer_util:middle(sourcer_util:middle(Ts))),
     {export_type, Pos#{comments=>Comments}, Fs};
 parse_attribute([{'-', Pos},{atom,#{value:='import'}}|Ts], Comments) ->
     {M, Fs0} = split_at(sourcer_util:middle(Ts), ','),
-    Fs = split_at_comma(sourcer_util:middle(Fs0)),
+    Fs = sourcer_util:split_at_comma(sourcer_util:middle(Fs0)),
     {import, Pos#{comments=>Comments}, M, Fs};
 parse_attribute([{'-', Pos},{atom,#{value:='module'}},{'(',_},{atom,#{value:=Name}}|_], Comments) ->
     {module, Pos#{comments=>Comments}, Name};
 parse_attribute([{'-', Pos},{atom,#{value:='compile'}}|Ts], Comments) ->
     {compile, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,#{value:='vsn'}}|Vsn], Comments) ->
-    {vsn, Pos#{comments=>Comments}, sourcer__util:middle(Vsn)};
+    {vsn, Pos#{comments=>Comments}, sourcer_util:middle(Vsn)};
 parse_attribute([{'-', Pos},{atom,#{value:='on_load'}}|Ts], Comments) ->
     {on_load, Pos#{comments=>Comments}, sourcer_util:middle(Ts)};
 parse_attribute([{'-', Pos},{atom,#{value:='behaviour'}}|Ts], Comments) ->
@@ -248,8 +248,8 @@ parse_clauses(Ts) ->
 
 parse_clause(Ts) ->
     [{_,P} | Toks] = Ts,
-    {Args0, Rest} = split_at_brace(Toks),
-    Args = split_at_comma(sourcer_util:middle(Args0)),
+    {Args0, Rest} = sourcer_util:split_at_brace(Toks),
+    Args = sourcer_util:split_at_comma(sourcer_util:middle(Args0)),
     {Guards0, Body} = split_at_arrow(Rest),
     Guards = case Guards0 of
                  [] ->
@@ -292,8 +292,6 @@ split_at_semicolon_name([H|T], Name, Acc, Crt) ->
     split_at_semicolon_name(T, Name, Acc, [H|Crt]).
 
 %% Split token list at "; ("
-split_at_semicolon([]) ->
-    [];
 split_at_semicolon(L) ->
     split_at_semicolon(L , [], []).
 
@@ -305,63 +303,6 @@ split_at_semicolon([{';', _}, {'(', _}=H2|T], Acc, Crt) ->
     split_at_semicolon([H2|T], [lists:reverse(Crt)|Acc], []);
 split_at_semicolon([H|T], Acc, Crt) ->
     split_at_semicolon(T, Acc, [H|Crt]).
-
-%% Split token list at top-level commas (not included in result),
-%% while keeping track of brace levels.
-split_at_comma([])->
-    [];
-split_at_comma(L)->
-    split_at_comma(L, [], []).
-
-split_at_comma([], Acc, Crt) ->
-    lists:reverse([lists:reverse(Crt) | Acc]);
-split_at_comma([H|T], Acc, Crt) when element(1, H)==',' ->
-    split_at_comma(T, [lists:reverse(Crt)|Acc], []);
-split_at_comma([H|T], Acc, Crt) ->
-    case token_pair(element(1, H)) of
-        none ->
-            split_at_comma(T, Acc, [H|Crt]);
-        End ->
-            {L1, L2} = split_at_brace(T, End, [H]),
-            split_at_comma(L2, Acc, lists:reverse(L1)++Crt)
-    end.
-
-
-%% Split L at the first matching brace, keeping track of brace levels.
-%% We assume that the start brace is the first element of the list.
-split_at_brace([]) ->
-    {[], []};
-split_at_brace([H|T]=L) ->
-    case token_pair(element(1, H)) of
-        none ->
-            {[], L};
-        End ->
-            split_at_brace(T, End, [H])
-    end.
-
-split_at_brace([], _, Acc) ->
-    {lists:reverse(Acc), []};
-split_at_brace([{End,_}=H|T], End, Acc) ->
-    {lists:reverse([H|Acc]), T};
-split_at_brace([H|T], End, Acc) ->
-    case token_pair(element(1, H)) of
-        none ->
-            split_at_brace(T, End, [H|Acc]);
-        Other ->
-            {L1, L2} = split_at_brace(T, Other, [H]),
-            split_at_brace(L2, End, lists:reverse(L1)++Acc)
-    end.
-
-token_pair('(') ->
-    ')';
-token_pair('[') ->
-    ']';
-token_pair('{') ->
-    '}';
-token_pair('<<') ->
-    '>>';
-token_pair(_) ->
-    none.
 
 split_at_arrow(L) ->
     split_at(L, '->').
@@ -376,18 +317,8 @@ split_at([{Delim, _}|Rest], Delim, R) ->
 split_at([H|Rest], Delim, R) ->
     split_at(Rest, Delim, [H|R]).
 
-filter_tokens(Toks) ->
-    lists:filter(fun filter_token/1, Toks).
-
-filter_token({white_space, _}) ->
-    false;
-filter_token({comment, _}) ->
-    false;
-filter_token(_) ->
-    true.
-
 record_def(Ts) ->
-    Fields = split_at_comma(sourcer_util:middle(Ts)),
+    Fields = sourcer_util:split_at_comma(sourcer_util:middle(Ts)),
     Fun = fun([{atom,Pos=#{value:=Name}}|TypeDef]) ->
                   Def0 = case TypeDef of
                              [{'=',_}|_] ->
@@ -410,8 +341,8 @@ parse_spec(Ts) ->
              end,
     Cls = split_at_semicolon([{'(',1}|Rest]),
     Fun = fun(X) ->
-                  {Args0,Return} = split_at_brace(X),
-                  Args = split_at_comma(sourcer_util:middle(Args0)),
+                  {Args0,Return} = sourcer_util:split_at_brace(X),
+                  Args = sourcer_util:split_at_comma(sourcer_util:middle(Args0)),
                   {Args, tl(Return)}
           end,
     Sigs = lists:map(Fun, Cls),

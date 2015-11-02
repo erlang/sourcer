@@ -75,17 +75,9 @@ parse(S) ->
     {ok, R} = sourcer_parse:string(S, #context{}),
     R.
 
-scan(D) ->
-    {ok, L, _} = sourcer_scan:string(D),
-    [{C, [setelement(2, T, 1)||T<-Ts]} || {C, Ts} <- L].
-
-scan1(D) ->
-    {ok, Ts, _} = erl_scan_local:string(D),
-    [setelement(2, T, 1) || T<-Ts].
-
 scan2(S) ->
     {ok, Mod0, _} = sourcer_scan:string(S),
-    sourcer_parse:filter_tokens(Mod0).
+    sourcer_util:filter_tokens(Mod0).
 
 find_forms(Key, #{forms:=Forms}) when is_atom(Key) ->
     Fun = fun(X) ->
