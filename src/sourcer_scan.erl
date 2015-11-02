@@ -28,9 +28,13 @@
 
 -include("sourcer.hrl").
 
+-spec string(string()) -> {'ok', sourcer:tokens(), sourcer:location()}
+                              | {'error', sourcer:location()}.
 string(D) ->
     string(D, {0, 1, 0}).
 
+-spec string(string(), sourcer:location()) -> {'ok', sourcer:tokens(), sourcer:location()}
+                                                  | {'error', sourcer:location()}.
 string(String, {L, C, O}) ->
     case string_2(String, {L, C, O}) of
         {ok, _, _}=R ->
@@ -55,6 +59,7 @@ string_2(D, {L, C, O}) ->
             _Err
     end.
 
+-spec convert_tokens_2([tuple()], sourcer:offset()) -> {[sourcer:token()], sourcer:offset()}.
 convert_tokens_2(Toks, Ofs) when is_list(Toks) ->
     lists:mapfoldl(fun convert_tokens_2_/2, Ofs, Toks).
 

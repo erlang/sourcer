@@ -173,7 +173,7 @@ parse_attribute([{'-', Pos},{atom,#{value:='define'}}|Ts], Comments) ->
                             {A,B} = sourcer_util:split_at_brace(Args0),
                             {
                              [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
-                             case B of [] -> []; _->tl(B) end
+                             case B of [] -> []; _ -> tl(B) end
                             };
                         _ ->
                             {[], tl(Args0)}

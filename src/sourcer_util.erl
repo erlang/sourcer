@@ -35,12 +35,13 @@ middle([_,_]) ->
 middle([_|T]) ->
     lists:reverse(tl(lists:reverse(T))).
 
-%% Split L at the first matching brace, keeping track of brace levels.
+%% @doc Split L at the first matching brace, keeping track of brace levels.
 %% We assume that the start brace is the first element of the list.
--spec split_at_brace([token()]) -> {[token()],_}.
+-spec split_at_brace(sourcer:tokens()) -> {sourcer:tokens(),sourcer:tokens()}.
+%%
 split_at_brace([]) ->
     {[], []};
-split_at_brace([H|T]=L) ->
+split_at_brace([H|T]=L) when is_list(T) ->
     case token_pair(element(1, H)) of
         none ->
             {[], L};
@@ -48,7 +49,8 @@ split_at_brace([H|T]=L) ->
             split_at_brace(T, End, [H])
     end.
 
--spec split_at_brace([token()],')' | '>>' | ']' | '}',[token(),...]) -> {[token(),...],_}.
+-spec split_at_brace(sourcer:tokens(),sourcer:close_brace(),sourcer:tokens()) -> {sourcer:tokens(),sourcer:tokens()}.
+%%
 split_at_brace([], _, Acc) ->
     {lists:reverse(Acc), []};
 split_at_brace([{End,_}=H|T], End, Acc) ->
@@ -62,21 +64,22 @@ split_at_brace([H|T], End, Acc) ->
             split_at_brace(L2, End, lists:reverse(L1)++Acc)
     end.
 
-%% Split token list at top-level commas (not included in result),
+%% @doc Split token list at top-level commas (not included in result),
 %% while keeping track of brace levels.
--spec split_at_comma([token()]) -> [[token()]].
+-spec split_at_comma(sourcer:tokens()) -> [sourcer:tokens()].
+%%
 split_at_comma([])->
     [];
 split_at_comma(L)->
     split_at_comma(L, [], []).
 
--spec split_at_comma(maybe_improper_list(),[[tuple()]],[tuple()]) -> [[tuple()],...].
+-spec split_at_comma(sourcer:tokens(),[sourcer:tokens()],sourcer:tokens()) -> [sourcer:tokens()].
 split_at_comma([], Acc, Crt) ->
     lists:reverse([lists:reverse(Crt) | Acc]);
-split_at_comma([H|T], Acc, Crt) when element(1, H)==',' ->
+split_at_comma([{',', _}|T], Acc, Crt) ->
     split_at_comma(T, [lists:reverse(Crt)|Acc], []);
-split_at_comma([H|T], Acc, Crt) ->
-    case token_pair(element(1, H)) of
+split_at_comma([{B, _}=H|T], Acc, Crt) ->
+    case token_pair(B) of
         none ->
             split_at_comma(T, Acc, [H|Crt]);
         End ->
@@ -84,7 +87,7 @@ split_at_comma([H|T], Acc, Crt) ->
             split_at_comma(L2, Acc, lists:reverse(L1)++Crt)
     end.
 
--spec token_pair(atom()) -> ')' | '>>' | ']' | 'none' | '}'.
+-spec token_pair(atom()) -> sourcer:close_brace() | 'none'.
 token_pair('(') ->
     ')';
 token_pair('[') ->
@@ -96,7 +99,7 @@ token_pair('<<') ->
 token_pair(X) when is_atom(X) ->
     none.
 
--spec filter_tokens([token()]) -> [token()].
+-spec filter_tokens(sourcer:tokens()) -> sourcer:tokens().
 filter_tokens(Toks) ->
     lists:filter(fun filter_token/1, Toks).
 

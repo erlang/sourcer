@@ -6,4 +6,3 @@
 %% -compile(export_all).
 %% -endif.
 
--type token() :: {atom(), #{}}.
