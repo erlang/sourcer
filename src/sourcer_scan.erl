@@ -16,7 +16,6 @@
 %% @doc Scanner that converts tokens returned by erl_scan_local into
 %% ones defined in sourcer_token.
 %%
-%%
 
 -module(sourcer_scan).
 
@@ -28,7 +27,6 @@
         ]).
 
 -include("sourcer.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 string(D) ->
     string(D, {0, 1, 0}).
@@ -105,12 +103,11 @@ fix_macro_tokens([{'?',P1},{'?',_},{var,P2}|T], Acc) ->
 fix_macro_tokens([H|T], Acc) ->
     fix_macro_tokens(T, [H|Acc]).
 
+%% TODO ?'a' vs ?a --> should be the same...
+
 mash_pos(#{}=P1,#{text:=T2}) ->
     %% TODO: unicode?
     P1#{text=>[$?|T2],length=>length(T2)+1, value=>list_to_atom(T2)}.
 mash_pos_2(#{}=P1,#{text:=T2}) ->
     %% TODO: unicode?
     P1#{text=>[$?,$?|T2],length=>length(T2)+2, value=>list_to_atom(T2)}.
-%% TODO ?'a' vs ?a --> should be the same...
-
-

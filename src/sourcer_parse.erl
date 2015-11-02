@@ -20,6 +20,7 @@
          tokens/2
         ]).
 
+-include("sourcer.hrl").
 -include("sourcer_parse.hrl").
 
 string(D, Context) when is_list(D), is_record(Context, context) ->
