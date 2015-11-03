@@ -2,7 +2,8 @@ language: erlang
 otp_release:
    - 18.1
 script:
-  - rebar compile && rebar skip_deps=true eunit
+  - ./rebar compile && ./rebar skip_deps=true eunit
   - wget http://download.erlide.org/tools/otp_18.1.plt
-#  - dialyzer --plt otp_18.1.plt -r ebin --statistics -Wunmatched_returns -Werror_handling -Wunknown && $?
+  - mv otp_18.1.plt .rebar/sourcer_18.1_plt
+  - ./rebar dialyze
 

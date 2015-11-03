@@ -6,3 +6,4 @@ deps/
 doc/*
 !doc/overview.edoc
 otp_18.1.plt
+.rebar/
