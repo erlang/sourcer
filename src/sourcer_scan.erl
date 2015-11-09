@@ -101,9 +101,9 @@ fix_macro_tokens([{'?',P1},{atom,P2}|T], Acc) ->
 fix_macro_tokens([{'?',P1},{var,P2}|T], Acc) ->
     fix_macro_tokens(T, [{macro, mash_pos(P1, P2)}|Acc]);
 fix_macro_tokens([{'?',P1},{'?',_},{atom,P2}|T], Acc) ->
-    fix_macro_tokens(T, [{macro, mash_pos_2(P1, P2)}|Acc]);
+    fix_macro_tokens(T, [{macro_str, mash_pos_2(P1, P2)}|Acc]);
 fix_macro_tokens([{'?',P1},{'?',_},{var,P2}|T], Acc) ->
-    fix_macro_tokens(T, [{macro, mash_pos_2(P1, P2)}|Acc]);
+    fix_macro_tokens(T, [{macro_str, mash_pos_2(P1, P2)}|Acc]);
 fix_macro_tokens([H|T], Acc) ->
     fix_macro_tokens(T, [H|Acc]).
 
@@ -160,13 +160,13 @@ fix_macro_tokens_test_() ->
                     {',',_},
                     {macro,#{text:="?'a'",value:='a'}},
                     {',',_},
-                    {macro,#{text:="??a",value:=a}},
+                    {macro_str,#{text:="??a",value:=a}},
                     {',',_},
-                    {macro,#{text:="??B",value:='B'}},
+                    {macro_str,#{text:="??B",value:='B'}},
                     {',',_},
-                    {macro,#{text:="??'A'",value:='A'}},
+                    {macro_str,#{text:="??'A'",value:='A'}},
                     {',',_},
-                    {macro,#{text:="??'a'",value:='a'}}
+                    {macro_str,#{text:="??'a'",value:='a'}}
                    ],
                    fix_macro_tokens(X))
     ].
