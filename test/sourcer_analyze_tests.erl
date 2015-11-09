@@ -31,24 +31,6 @@ analyze_module_test_() ->
                    sourcer_analyze:analyze_module(Mod))
     ].
 
-find_forms_test_() ->
-    {Mod, _} = parse(""
-                     "-module(fox).\n"
-                     "-export([a/2]).\n"
-                     "-export([b/3]).\n"
-                     "-include_lib(\"bar.hrl\").\n"
-                     "fow(A) -> A.\n"
-                    ),
-    [
-     ?_assertMatch([{module,[{module,_,fox}]},
-                    {export,[{export,_,[[{atom,#{value:=b}},{'/',_},{integer,#{value:=3}}]]},
-                             {export,_,[[{atom,#{value:=a}},{'/',_},{integer,#{value:=2}}]]}]},
-                    {include_lib,[{include_lib,_,"bar.hrl"}]},
-                    {function,[{function,_,fow,1,
-                                [{clause,_,[[{var,#{value:='A'}}]],[],[{var,#{value:='A'}}]}]}]}],
-                   sourcer_analyze:group_forms(Mod))
-    ].
-
 analyze_references_test_() ->
     [
      ?_assertMatch([{macroref,#{line:=0,column:=10,offset:=9,length:=3},'Z4'},

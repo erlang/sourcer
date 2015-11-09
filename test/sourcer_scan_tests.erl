@@ -210,40 +210,6 @@ string_test_() ->
      ?_assertEqual(sourcer_scan:string(S, {0, 1, 0}), sourcer_scan:string(S))
     ].
 
-convert_attributes_test_() ->
-    Toks = [
-            {'-',[{line,1},{column,1},{text,"-"}]},
-            {atom,[{line,1},{column,2},{text,"module"}],module},
-            {'(',[{line,2},{column,1},{text,"("}]},
-            {atom,[{line,2},{column,2},{text,"asx"}],asx},
-            {')',[{line,2},{column,5},{text,")"}]},
-            {dot,[{line,2},{column,6},{text,"."}]}
-           ],
-    [
-     ?_assertMatch({
-                    [
-                     {'-',#{line:=1,column:=1,text:="-",offset:=0}},
-                     {atom,#{line:=1,column:=2,text:="module",offset:=1}},
-                     {'(',#{line:=2,column:=1,text:="(",offset:=7}},
-                     {atom,#{line:=2,column:=2,text:="asx",offset:=8}},
-                     {')',#{line:=2,column:=5,text:=")",offset:=11}},
-                     {dot,#{line:=2,column:=6,text:=".",offset:= 12}}
-                    ],
-                    13
-                   }, sourcer_scan:convert_tokens_2(Toks, 0))
-    ].
-
-fix_macro_tokens_test_() ->
-    {ok, X, _} = sourcer_scan:string("?a,?B"),
-    [
-     ?_assertMatch([
-                    {macro,#{line:=0,column:=1,text:="?a"}},
-                    {',',_},
-                    {macro,#{line:=0,column:=4,text:="?B"}}
-                   ],
-                   sourcer_scan:fix_macro_tokens(X))
-    ].
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_scan(S) ->

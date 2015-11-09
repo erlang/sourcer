@@ -194,6 +194,7 @@ tokens({erl_scan_continuation,Cs,Col,Toks,Line,St,Any,Fun},
        CharSpec, _Loc, _Opts) ->
     tokens1(Cs++CharSpec, St, Line, Col, Toks, Fun, Any).
 
+-spec continuation_location(tuple())-> line() | {line(), column()}.
 continuation_location({erl_scan_continuation,_,no_col,_,Line,_,_,_}) ->
     Line;
 continuation_location({erl_scan_continuation,_,Col,_,Line,_,_,_}) ->

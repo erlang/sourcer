@@ -23,6 +23,7 @@
 -include("sourcer.hrl").
 -include("sourcer_parse.hrl").
 
+-spec string(string(), context()) -> {'ok', {#{}, context()}} | {'error', any()}.
 string(D, Context) when is_list(D), is_record(Context, context) ->
     case sourcer_scan:string(D) of
         {ok, Toks, _} ->
@@ -31,6 +32,7 @@ string(D, Context) when is_list(D), is_record(Context, context) ->
             _Err
     end.
 
+-spec tokens(sourcer:tokens(), context()) -> {#{}, context()}.
 tokens(Toks, Context) ->
     Raw = split_at_dot(Toks),
     {Parsed, NewContext} = parse_forms(Raw, Context),
@@ -66,32 +68,32 @@ extract_top_comments([{white_space, _}|Toks], Acc) ->
 extract_top_comments(Toks, Acc) ->
     {lists:reverse(Acc), Toks}.
 
-top_comment(Comments) ->
-    lists:filter(fun({comment,_})->true; (_)->false end, Comments).
-
-%% group comments with same level and no spaces inbetween
-group_comments(C) ->
-    case skip_white_at_start(C) of
-        [] ->
-            [];
-        [H|_]=C1 ->
-            Level = comment_level(H),
-            {G, Rest} = get_first_group(Level, C1, []),
-            [G] ++ group_comments(Rest)
-    end.
-
-get_first_group(_, [], Acc) ->
-    {lists:reverse(Acc), []};
-get_first_group(Level, [H|T]=L, Acc) ->
-    case comment_level(H) of
-        Level ->
-            get_first_group(Level, T, [H|Acc]);
-        _ ->
-            {lists:reverse(Acc), L}
-    end.
-
-skip_white_at_start(L) ->
-    lists:dropwhile(fun({white_space,_})->true; (_)->false end, L).
+%% top_comment(Comments) ->
+%%     lists:filter(fun({comment,_})->true; (_)->false end, Comments).
+%%
+%% %% group comments with same level and no spaces inbetween
+%% group_comments(C) ->
+%%     case skip_white_at_start(C) of
+%%         [] ->
+%%             [];
+%%         [H|_]=C1 ->
+%%             Level = comment_level(H),
+%%             {G, Rest} = get_first_group(Level, C1, []),
+%%             [G] ++ group_comments(Rest)
+%%     end.
+%%
+%% get_first_group(_, [], Acc) ->
+%%     {lists:reverse(Acc), []};
+%% get_first_group(Level, [H|T]=L, Acc) ->
+%%     case comment_level(H) of
+%%         Level ->
+%%             get_first_group(Level, T, [H|Acc]);
+%%         _ ->
+%%             {lists:reverse(Acc), L}
+%%     end.
+%%
+%% skip_white_at_start(L) ->
+%%     lists:dropwhile(fun({white_space,_})->true; (_)->false end, L).
 
 compact_comments([]) ->
     {comments, none, [], 0};
@@ -276,10 +278,8 @@ split_at_dot([H|Ts], Acc, Crt) ->
 %% Split token list at "; Name (", where Name is the same
 %% as the first token which must be an atom.
 %% Semicolon is not included in result.
-split_at_semicolon_name([]) ->
-    [];
-split_at_semicolon_name(L) ->
-    {atom, #{value:=Name}} = hd(L),
+split_at_semicolon_name([H|_]=L) ->
+    {atom, #{value:=Name}} = H,
     split_at_semicolon_name(L , Name, [], []).
 
 split_at_semicolon_name([], _, R, []) ->
@@ -358,3 +358,136 @@ is_active_define({'not', A}, Defs) ->
 is_active_define(A, Defs) ->
     sets:is_element(A, Defs) andalso not sets:is_element({'not', A}, Defs).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+split_at_dot_test_() ->
+    [
+     ?_assertMatch([[a,b,c]],
+                   split_at_dot([a,b,c])),
+     ?_assertMatch([[a],[b,c]],
+                   split_at_dot([a,{dot,0},b,c])),
+     ?_assertMatch([[a],[b,c]],
+                   split_at_dot([a,{dot,0},b,c,{dot,0}])),
+     ?_assertMatch([],
+                   split_at_dot([]))
+    ].
+
+extract_top_comments_test_() ->
+    [
+     ?_assertMatch({[{comment,#{text:=<<"%a">>}},
+                     {comment,#{text:=<<"%b">>}},
+                     {comment,#{text:=<<"%%c">>}}],
+                    [{atom,#{value:=hello}}]},
+                   extract_top_comments(scan("%a\n%b\n%%c\nhello"))),
+     ?_assertMatch({[{comment,#{text:=<<"%a">>}},
+                     {comment,#{text:=<<"%b">>}},
+                     {comment,#{text:=<<"%%c">>}}],
+                    [{atom,#{value:=hello}}]},
+                   extract_top_comments(scan("%a\n\n%b\n%%c\nhello")))
+    ].
+
+ split_at_semicolon_name_test_() ->
+     [
+      ?_assertMatch([[{atom, #{value:=a}},
+                      {atom, #{value:=b}},
+                      {atom, #{value:=c}}]],
+                    split_at_semicolon_name([{atom, #{value=>a}},
+                                                           {atom, #{value=>b}},
+                                                           {atom, #{value=>c}}])),
+     ?_assertMatch([[{atom, #{value:=a}},
+                     {';',_},
+                     {atom, #{value:=b}},
+                     {',',_},
+                     {atom, #{value:=c}}]],
+                   split_at_semicolon_name(scan("a;b,c"))),
+     ?_assertMatch([[{atom, #{value:=a}},{';',_},{atom, #{value:=a}},{',',_},{atom, #{value:=b}}]],
+                   split_at_semicolon_name(scan("a;a,b"))),
+     ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_}],
+                    [{atom, #{value:=a}},{'(',_},{atom, #{value:=e}},{')',_}]],
+                   split_at_semicolon_name(scan("a(b);a(e)"))),
+     ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_},{';',_},
+                     {atom, #{value:=c}},{'(',_},{atom, #{value:=d}},{')',_}]],
+                   split_at_semicolon_name(scan("a(b);c(d)")))
+     ].
+
+split_at_semicolon_test_() ->
+    [
+     ?_assertMatch([[{atom, #{value:=a}},{',',_},{atom, #{value:=b}},{',',_},{atom, #{value:=c}}]],
+                   split_at_semicolon(scan("a,b,c"))),
+     ?_assertMatch([[{atom, #{value:=a}},{';',_},{atom, #{value:=b}},{',',_},{atom, #{value:=c}}]],
+                   split_at_semicolon(scan("a;b,c"))),
+     ?_assertMatch([[{'(',_},{atom, #{value:=b}},{')',_},{atom, #{value:=zz}}],
+                    [{'(',_},{atom, #{value:=e}},{')',_},{atom, #{value:=xx}}]],
+                   split_at_semicolon(scan("(b)zz;(e)xx"))),
+     ?_assertMatch([],
+                   split_at_semicolon([]))
+    ].
+
+is_active_context_test_() ->
+    [
+     ?_assertEqual(true,
+                   is_active_context(
+                     #context{defines=sets:from_list([x]),
+                              active=[]
+                             })),
+     ?_assertEqual(true,
+                   is_active_context(
+                     #context{defines=sets:from_list([x]),
+                              active=[x]
+                             })),
+     ?_assertEqual(true,
+                   is_active_context(
+                     #context{defines=sets:from_list([{'not', x}]),
+                              active=[]
+                             })),
+     ?_assertEqual(false,
+                   is_active_context(
+                     #context{defines=sets:from_list([{'not', x}]),
+                              active=[x]
+                             })),
+     ?_assertEqual(false,
+                   is_active_context(
+                     #context{defines=sets:from_list([x]),
+                              active=[{'not', x}]
+                             })),
+     ?_assertEqual(false,
+                   is_active_context(
+                     #context{defines=sets:from_list([]),
+                              active=[x]
+                             })),
+     ?_assertEqual(true,
+                   is_active_context(
+                     #context{defines=sets:from_list([]),
+                              active=[{'not',x}]
+                             })),
+     ?_assertEqual(false,
+                   is_active_context(
+                     #context{defines=sets:from_list([x]),
+                              active=[{'not',x},x]
+                             })),
+     ?_assertEqual(true,
+                   is_active_context(#context{}))
+    ].
+
+parse_clause_test_() ->
+    [
+     ?_assertMatch({clause, _, [], [], [{atom,#{value:=a}}]},
+                   parse_clause(scan("foo()->a"))),
+     ?_assertMatch({clause,_,
+                    [[{atom,#{value:=x}}],[{atom,#{value:=y}}]],
+                    [],
+                    [{atom,#{value:=a}},{',',_},{atom,#{value:=b}}]},
+                   parse_clause(scan("foo(x,y)->a,b")))
+    ].
+
+%%%%%%%
+
+scan(D) ->
+    {ok, Ts, _} = sourcer_scan:string(D),
+    Ts.
+
+-endif.

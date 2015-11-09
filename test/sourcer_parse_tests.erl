@@ -3,83 +3,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_parse.hrl").
 
-split_at_dot_test_() ->
-    [
-     ?_assertMatch([[a,b,c]],
-                   sourcer_parse:split_at_dot([a,b,c])),
-     ?_assertMatch([[a],[b,c]],
-                   sourcer_parse:split_at_dot([a,{dot,0},b,c])),
-     ?_assertMatch([[a],[b,c]],
-                   sourcer_parse:split_at_dot([a,{dot,0},b,c,{dot,0}])),
-     ?_assertMatch([],
-                   sourcer_parse:split_at_dot([]))
-    ].
-
-extract_top_comments_test_() ->
-    [
-     ?_assertMatch({[{comment,#{text:=<<"%a">>}},
-                     {comment,#{text:=<<"%b">>}},
-                     {comment,#{text:=<<"%%c">>}}],
-                    [{atom,#{value:=hello}}]},
-                   sourcer_parse:extract_top_comments(scan("%a\n%b\n%%c\nhello"))),
-     ?_assertMatch({[{comment,#{text:=<<"%a">>}},
-                     {comment,#{text:=<<"%b">>}},
-                     {comment,#{text:=<<"%%c">>}}],
-                    [{atom,#{value:=hello}}]},
-                   sourcer_parse:extract_top_comments(scan("%a\n\n%b\n%%c\nhello")))
-    ].
-
- split_at_semicolon_name_test_() ->
-     [
-      ?_assertMatch([[{atom, #{value:=a}},
-                      {atom, #{value:=b}},
-                      {atom, #{value:=c}}]],
-                    sourcer_parse:split_at_semicolon_name([{atom, #{value=>a}},
-                                                           {atom, #{value=>b}},
-                                                           {atom, #{value=>c}}])),
-     ?_assertMatch([[{atom, #{value:=a}},
-                     {';',_},
-                     {atom, #{value:=b}},
-                     {',',_},
-                     {atom, #{value:=c}}]],
-                   sourcer_parse:split_at_semicolon_name(scan("a;b,c"))),
-     ?_assertMatch([[{atom, #{value:=a}},{';',_},{atom, #{value:=a}},{',',_},{atom, #{value:=b}}]],
-                   sourcer_parse:split_at_semicolon_name(scan("a;a,b"))),
-     ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_}],
-                    [{atom, #{value:=a}},{'(',_},{atom, #{value:=e}},{')',_}]],
-                   sourcer_parse:split_at_semicolon_name(scan("a(b);a(e)"))),
-     ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_},{';',_},
-                     {atom, #{value:=c}},{'(',_},{atom, #{value:=d}},{')',_}]],
-                   sourcer_parse:split_at_semicolon_name(scan("a(b);c(d)"))),
-      ?_assertMatch([],
-                    sourcer_parse:split_at_semicolon_name([]))
-     ].
-
-split_at_semicolon_test_() ->
-    [
-     ?_assertMatch([[{atom, #{value:=a}},{',',_},{atom, #{value:=b}},{',',_},{atom, #{value:=c}}]],
-                   sourcer_parse:split_at_semicolon(scan("a,b,c"))),
-     ?_assertMatch([[{atom, #{value:=a}},{';',_},{atom, #{value:=b}},{',',_},{atom, #{value:=c}}]],
-                   sourcer_parse:split_at_semicolon(scan("a;b,c"))),
-     ?_assertMatch([[{'(',_},{atom, #{value:=b}},{')',_},{atom, #{value:=zz}}],
-                    [{'(',_},{atom, #{value:=e}},{')',_},{atom, #{value:=xx}}]],
-                   sourcer_parse:split_at_semicolon(scan("(b)zz;(e)xx"))),
-     ?_assertMatch([],
-                   sourcer_parse:split_at_semicolon([]))
-    ].
 
 -define(F(T), #{forms:=T}).
 -define(FC(T,C), {#{forms:=T}, C}).
 
 parse_string_test_() ->
     [
-     ?_assertMatch({clause, _, [], [], [{atom,#{value:=a}}]},
-                   sourcer_parse:parse_clause(scan("foo()->a"))),
-     ?_assertMatch({clause,_,
-                    [[{atom,#{value:=x}}],[{atom,#{value:=y}}]],
-                    [],
-                    [{atom,#{value:=a}},{',',_},{atom,#{value:=b}}]},
-                   sourcer_parse:parse_clause(scan("foo(x,y)->a,b"))),
      ?_assertMatch(?F([{function,_,foo,0,
                       [{clause,_,[],[],[{atom,#{value:=ok}}]}]}]),
                    parse2("foo()->ok. ")),
@@ -199,57 +128,7 @@ parse_context_test_() ->
                    parse("-ifdef(X). -else. -endif. "))
     ].
 
-is_active_context_test_() ->
-    [
-     ?_assertEqual(true,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([x]),
-                              active=[]
-                             })),
-     ?_assertEqual(true,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([x]),
-                              active=[x]
-                             })),
-     ?_assertEqual(true,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([{'not', x}]),
-                              active=[]
-                             })),
-     ?_assertEqual(false,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([{'not', x}]),
-                              active=[x]
-                             })),
-     ?_assertEqual(false,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([x]),
-                              active=[{'not', x}]
-                             })),
-     ?_assertEqual(false,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([]),
-                              active=[x]
-                             })),
-     ?_assertEqual(true,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([]),
-                              active=[{'not',x}]
-                             })),
-     ?_assertEqual(false,
-                   sourcer_parse:is_active_context(
-                     #context{defines=sets:from_list([x]),
-                              active=[{'not',x},x]
-                             })),
-     ?_assertEqual(true,
-                   sourcer_parse:is_active_context(#context{}))
-    ].
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-
-scan(D) ->
-    {ok, Ts, _} = sourcer_scan:string(D),
-    Ts.
 
 parse2(S) ->
     {F, _} = ok(sourcer_parse:string(S, #context{})),

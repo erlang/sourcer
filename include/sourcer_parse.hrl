@@ -1,10 +1,3 @@
--ifndef(TEST).
--define(TEST, true).
--endif.
-
--ifdef(TEST).
--compile(export_all).
--endif.
 
 %% TODO: maybe make this recursive, to be easy to push/pop new stuff?
 %% for example, inside an ifdef.
@@ -32,3 +25,4 @@
                   included=[]
                  }).
 
+-type context() :: #context{}.

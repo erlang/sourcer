@@ -20,15 +20,8 @@
          analyze_references/1
         ]).
 
--ifndef(TEST).
--define(TEST, true).
--endif.
-
-%% for tests
--ifdef(TEST).
--compile(export_all).
--endif.
-
+-include("sourcer.hrl").
+-include("sourcer_parse.hrl").
 -include("sourcer_analyze.hrl").
 
 %% XXX structure around ifdefs!?
@@ -164,3 +157,33 @@ get_arity([{'(',_}|_]=Ts) ->
     length(sourcer_util:split_at_comma(sourcer_util:middle(A)));
 get_arity(_) ->
     -1.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+find_forms_test_() ->
+    {Mod, _} = parse(""
+                     "-module(fox).\n"
+                     "-export([a/2]).\n"
+                     "-export([b/3]).\n"
+                     "-include_lib(\"bar.hrl\").\n"
+                     "fow(A) -> A.\n"
+                    ),
+    [
+     ?_assertMatch([{module,[{module,_,fox}]},
+                    {export,[{export,_,[[{atom,#{value:=b}},{'/',_},{integer,#{value:=3}}]]},
+                             {export,_,[[{atom,#{value:=a}},{'/',_},{integer,#{value:=2}}]]}]},
+                    {include_lib,[{include_lib,_,"bar.hrl"}]},
+                    {function,[{function,_,fow,1,
+                                [{clause,_,[[{var,#{value:='A'}}]],[],[{var,#{value:='A'}}]}]}]}],
+                   group_forms(Mod))
+    ].
+
+parse(S) ->
+    {ok, R} = sourcer_parse:string(S, #context{}),
+    R.
+
+-endif.

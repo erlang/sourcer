@@ -21,9 +21,7 @@
 
 -export([
          string/1,
-         string/2,
-         convert_tokens_2/2,
-         fix_macro_tokens/1
+         string/2
         ]).
 
 -include("sourcer.hrl").
@@ -91,6 +89,7 @@ convert_tokens_3_({K,A,V}, Ofs) ->
 %%             convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
 %%     end;
 
+-spec fix_macro_tokens([any()]) -> [any()].
 fix_macro_tokens(Toks) ->
     fix_macro_tokens(Toks, []).
 
@@ -116,3 +115,47 @@ mash_pos(#{}=P1,#{text:=T2}) ->
 mash_pos_2(#{}=P1,#{text:=T2}) ->
     %% TODO: unicode?
     P1#{text=>[$?,$?|T2],length=>length(T2)+2, value=>list_to_atom(T2)}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+convert_attributes_test_() ->
+    Toks = [
+            {'-',[{line,1},{column,1},{text,"-"}]},
+            {atom,[{line,1},{column,2},{text,"module"}],module},
+            {'(',[{line,2},{column,1},{text,"("}]},
+            {atom,[{line,2},{column,2},{text,"asx"}],asx},
+            {')',[{line,2},{column,5},{text,")"}]},
+            {dot,[{line,2},{column,6},{text,"."}]}
+           ],
+    [
+     ?_assertMatch({
+                    [
+                     {'-',#{line:=1,column:=1,text:="-",offset:=0}},
+                     {atom,#{line:=1,column:=2,text:="module",offset:=1}},
+                     {'(',#{line:=2,column:=1,text:="(",offset:=7}},
+                     {atom,#{line:=2,column:=2,text:="asx",offset:=8}},
+                     {')',#{line:=2,column:=5,text:=")",offset:=11}},
+                     {dot,#{line:=2,column:=6,text:=".",offset:= 12}}
+                    ],
+                    13
+                   }, convert_tokens_2(Toks, 0))
+    ].
+
+fix_macro_tokens_test_() ->
+    {ok, X, _} = string("?a,?B,?'A'"),
+    [
+     ?_assertMatch([
+                    {macro,#{line:=0,column:=1,text:="?a"}},
+                    {',',_},
+                    {macro,#{line:=0,column:=4,text:="?B"}},
+                    {',',_},
+                    {macro,#{line:=0,column:=7,text:="?'A'"}}
+                   ],
+                   fix_macro_tokens(X))
+    ].
+
+-endif.
