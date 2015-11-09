@@ -107,13 +107,16 @@ fix_macro_tokens([{'?',P1},{'?',_},{var,P2}|T], Acc) ->
 fix_macro_tokens([H|T], Acc) ->
     fix_macro_tokens(T, [H|Acc]).
 
-%% TODO ?'a' vs ?a --> should be the same...
+%% TODO: unicode?
 
+mash_pos(#{}=P1,#{text:="'"++_=T2}) ->
+    P1#{text=>[$?|T2],length=>length(T2)+1, value=>list_to_atom(sourcer_util:middle(T2))};
 mash_pos(#{}=P1,#{text:=T2}) ->
-    %% TODO: unicode?
     P1#{text=>[$?|T2],length=>length(T2)+1, value=>list_to_atom(T2)}.
+
+mash_pos_2(#{}=P1,#{text:="'"++_=T2}) ->
+    P1#{text=>[$?,$?|T2],length=>length(T2)+2, value=>list_to_atom(sourcer_util:middle(T2))};
 mash_pos_2(#{}=P1,#{text:=T2}) ->
-    %% TODO: unicode?
     P1#{text=>[$?,$?|T2],length=>length(T2)+2, value=>list_to_atom(T2)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,14 +149,24 @@ convert_attributes_test_() ->
     ].
 
 fix_macro_tokens_test_() ->
-    {ok, X, _} = string("?a,?B,?'A'"),
+    {ok, X, _} = string("?a,?B,?'A',?'a',??a,??B,??'A',??'a'"),
     [
      ?_assertMatch([
-                    {macro,#{line:=0,column:=1,text:="?a"}},
+                    {macro,#{text:="?a",value:=a}},
                     {',',_},
-                    {macro,#{line:=0,column:=4,text:="?B"}},
+                    {macro,#{text:="?B",value:='B'}},
                     {',',_},
-                    {macro,#{line:=0,column:=7,text:="?'A'"}}
+                    {macro,#{text:="?'A'",value:='A'}},
+                    {',',_},
+                    {macro,#{text:="?'a'",value:='a'}},
+                    {',',_},
+                    {macro,#{text:="??a",value:=a}},
+                    {',',_},
+                    {macro,#{text:="??B",value:='B'}},
+                    {',',_},
+                    {macro,#{text:="??'A'",value:='A'}},
+                    {',',_},
+                    {macro,#{text:="??'a'",value:='a'}}
                    ],
                    fix_macro_tokens(X))
     ].
