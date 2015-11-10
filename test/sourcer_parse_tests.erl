@@ -102,8 +102,8 @@ parse_context_test_() ->
                       [],
                       [{'[',_},{atom,#{value:=s}},{',',_}]}],
                     {['X'], []}},
-                   parse("-define(X, [s,). ")),
-     ?_assertMatch({[{define,_,{var, #{value:='X'}}, 0, [],
+                   parse("-define(X(), [s,). ")),
+     ?_assertMatch({[{define,_,{var, #{value:='X'}}, -1, none,
                       [{'[',_},{atom,#{value:=s}},{',',_}]},
                      {undef,_,{var,#{value:='X'}}}],
                     {[], []}},
@@ -135,7 +135,7 @@ parse(S) ->
     {F, C} = ok(sourcer_parse:string(S, #context{})),
     {F, ctxt(C)}.
 
-ctxt(#context{defines=D, active=A}) ->
+ctxt(#context{defines=D, active=A, macros=_M}) ->
     {sets:to_list(D), A}.
 
 ok({ok, R, _}) ->

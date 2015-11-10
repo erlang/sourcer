@@ -113,6 +113,7 @@ skip_percent("%"++L) ->
 skip_percent(L) ->
     L.
 
+%% TODO includes and include_lib!
 expand_macros(Tokens, Context) ->
     case one_step_expand(Tokens, Context) of
         {ok, Toks, _Ctx} ->
@@ -138,8 +139,10 @@ one_step_expand([{macro,_}=H|T], Context, Acc, More) ->
 one_step_expand([H|T], Context, Acc, More) ->
     one_step_expand(T, Context, [H|Acc], More).
 
-get_macro_def({macro, _Attrs}, _Ctx) ->
-    [].
+%% TODO macro arguments!
+get_macro_def({macro, #{value:=Name}}, #context{macros=M}) ->
+    {Name, _, _, Value} = lists:keyfind(Name, 1, M),
+    Value.
 
 has_macros(Def) ->
     lists:any(fun({macro, _})->true; (_)-> false end, Def).
@@ -154,12 +157,12 @@ do_parse_form([{'-',_}|_]=Ts, Context, Comments) ->
 do_parse_form(Ts, Context, _Comments) ->
     {parse_unknown(Ts), Context}.
 
-get_context({'define', _, {_,#{value:=Name}}, Arity, _, _}, #context{defines=Defs, macros=Macros}=Ctx) ->
+get_context({'define', _, {_,#{value:=Name}}, Arity, Args, Value}, #context{defines=Defs, macros=Macros}=Ctx) ->
     Ctx#context{defines=sets:add_element(Name, Defs),
-                macros=[{Name, Arity}|Macros]};
+                macros=[{Name, Arity, Args, Value}|Macros]};
 get_context({'undef', _, {_, #{value:=Name}}}, #context{defines=Defs, macros=Macros}=Ctx) ->
     Ctx#context{defines=sets:del_element(Name, Defs),
-                macros=lists:filter(fun({X, _})->
+                macros=lists:filter(fun({X, _, _, _})->
                                             X =/= Name
                                     end,
                                     Macros)};
@@ -199,19 +202,17 @@ parse_attribute([{'-', Pos},{atom,#{value:='undef'}},{'(', _},Name,{')',_}], Com
     {undef, Pos#{comments=>Comments}, Name};
 parse_attribute([{'-', Pos},{atom,#{value:='define'}}|Ts], Comments) ->
     [Name | Args0] = sourcer_util:middle(Ts),
-    {Args, Value} = case Args0 of
-                        [] ->
-                            [];
+    {Args, Arity, Value} = case Args0 of
                         [{'(',_}|_] ->
                             {A,B} = sourcer_util:split_at_brace(Args0),
+                            Args1 = [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
                             {
-                             [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
+                             Args1, length(Args1),
                              case B of [] -> []; _ -> tl(B) end
                             };
                         _ ->
-                            {[], tl(Args0)}
+                            {none, -1, tl(Args0)}
                     end,
-    Arity = length(Args),
     {define, Pos#{comments=>Comments}, Name, Arity, Args, Value};
 parse_attribute([{'-', Pos},{atom,#{value:='record'}}|Ts], Comments) ->
     [{atom, #{value:=Name}}, {',', _} | Def] = sourcer_util:middle(Ts),
