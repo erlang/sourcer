@@ -6,7 +6,8 @@
               token/0,
               tokens/0,
               open_brace/0,
-              close_brace/0
+              close_brace/0,
+              form/0
              ]).
 
 -type location() :: {erl_anno:line(), erl_anno:column(), offset()}.
@@ -17,3 +18,5 @@
 
 -type open_brace() :: '(' | '<<' | '[' | '{'.
 -type close_brace() :: ')' | '>>' | ']' | '}'.
+
+-type form() :: tuple().

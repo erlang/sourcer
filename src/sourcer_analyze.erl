@@ -27,7 +27,7 @@
 %% XXX structure around ifdefs!?
 
 %% Gather the relevant information about a module, from each form.
--spec analyze_module(#{}) -> #module{}.
+-spec analyze_module([form()]) -> #module{}.
 analyze_module(Mod) ->
     Forms = group_forms(Mod),
 
@@ -132,10 +132,10 @@ mk_loc(Start, End) ->
 module_keys() ->
     [
      module, include, include_lib, function, record, type, opaque,
-     export, import
+     export, import, export_type
     ].
 
-group_forms(#{forms:=Forms})  ->
+group_forms(Forms)  ->
     group_forms(module_keys(), Forms, []).
 
 group_forms(_, [], Acc) ->

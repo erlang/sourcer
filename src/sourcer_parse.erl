@@ -23,7 +23,7 @@
 -include("sourcer.hrl").
 -include("sourcer_parse.hrl").
 
--spec string(string(), context()) -> {'ok', {#{}, context()}} | {'error', any()}.
+-spec string(string(), context()) -> {'ok', {[sourcer:form()], context()}} | {'error', any()}.
 string(D, Context) when is_list(D), is_record(Context, context) ->
     case sourcer_scan:string(D) of
         {ok, Toks, _} ->
@@ -32,11 +32,10 @@ string(D, Context) when is_list(D), is_record(Context, context) ->
             _Err
     end.
 
--spec tokens(sourcer:tokens(), context()) -> {#{}, context()}.
+-spec tokens(sourcer:tokens(), context()) -> {[sourcer:form()], context()}.
 tokens(Toks, Context) ->
     Raw = split_at_dot(Toks),
-    {Parsed, NewContext} = parse_forms(Raw, Context),
-    {#{all=>Toks, rawForms=>Raw, forms=>Parsed}, NewContext}.
+    parse_forms(Raw, Context).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -45,7 +44,8 @@ parse_forms(Toks, Context) ->
 
 %% keep track of macro context
 parse_form(Ts, Context) ->
-    {TopComments, Ts1} = extract_top_comments(Ts),
+    Ts0 = expand_macros(Ts, Context),
+    {TopComments, Ts1} = extract_top_comments(Ts0),
     Ts2 = sourcer_util:filter_tokens(Ts1),
     {Form, Ctx} = do_parse_form(Ts2, Context, []),
     Form2 = update_attributes(Form,
@@ -112,6 +112,37 @@ skip_percent("%"++L) ->
     skip_percent(L);
 skip_percent(L) ->
     L.
+
+expand_macros(Tokens, Context) ->
+    case one_step_expand(Tokens, Context) of
+        {ok, Toks, _Ctx} ->
+            Toks;
+        {more, Toks, Ctx} ->
+            expand_macros(Toks, Ctx)
+    end.
+
+one_step_expand(Tokens, Context) ->
+    one_step_expand(Tokens, Context, [], false).
+
+one_step_expand([], Ctx, R, true) ->
+    {more, lists:reverse(R), Ctx};
+one_step_expand([], Ctx, R, false) ->
+    {ok, lists:reverse(R), Ctx};
+one_step_expand([{macro,_}=H|T], Context, Acc, More) ->
+
+    %% TODO handle macro arguments!
+
+    Def = get_macro_def(H, Context),
+    More2 = More or has_macros(Def),
+    one_step_expand(T, Context, lists:reverse(Def)++Acc, More2);
+one_step_expand([H|T], Context, Acc, More) ->
+    one_step_expand(T, Context, [H|Acc], More).
+
+get_macro_def({macro, _Attrs}, _Ctx) ->
+    [].
+
+has_macros(Def) ->
+    lists:any(fun({macro, _})->true; (_)-> false end, Def).
 
 %% TODO set 'active' attribute on form, if
 do_parse_form([{atom,_}|_]=Ts, Context, Comments) ->
@@ -390,14 +421,14 @@ extract_top_comments_test_() ->
                    extract_top_comments(scan("%a\n\n%b\n%%c\nhello")))
     ].
 
- split_at_semicolon_name_test_() ->
-     [
-      ?_assertMatch([[{atom, #{value:=a}},
-                      {atom, #{value:=b}},
-                      {atom, #{value:=c}}]],
-                    split_at_semicolon_name([{atom, #{value=>a}},
-                                                           {atom, #{value=>b}},
-                                                           {atom, #{value=>c}}])),
+split_at_semicolon_name_test_() ->
+    [
+     ?_assertMatch([[{atom, #{value:=a}},
+                     {atom, #{value:=b}},
+                     {atom, #{value:=c}}]],
+                   split_at_semicolon_name([{atom, #{value=>a}},
+                                            {atom, #{value=>b}},
+                                            {atom, #{value=>c}}])),
      ?_assertMatch([[{atom, #{value:=a}},
                      {';',_},
                      {atom, #{value:=b}},
@@ -412,7 +443,7 @@ extract_top_comments_test_() ->
      ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_},{';',_},
                      {atom, #{value:=c}},{'(',_},{atom, #{value:=d}},{')',_}]],
                    split_at_semicolon_name(scan("a(b);c(d)")))
-     ].
+    ].
 
 split_at_semicolon_test_() ->
     [
@@ -483,6 +514,16 @@ parse_clause_test_() ->
                     [{atom,#{value:=a}},{',',_},{atom,#{value:=b}}]},
                    parse_clause(scan("foo(x,y)->a,b")))
     ].
+
+has_macros_test_() ->
+    [
+     ?_assertEqual(false,
+                   has_macros([{atom, 0}])),
+     ?_assertEqual(true,
+                   has_macros([{atom, 0},{macro, 1}])),
+     ?_assertEqual(false,
+                   has_macros([]))
+     ].
 
 %%%%%%%
 

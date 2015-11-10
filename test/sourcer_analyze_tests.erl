@@ -61,7 +61,7 @@ scan2(S) ->
     {ok, Mod0, _} = sourcer_scan:string(S),
     sourcer_util:filter_tokens(Mod0).
 
-find_forms(Key, #{forms:=Forms}) when is_atom(Key) ->
+find_forms(Key, Forms) when is_atom(Key) ->
     Fun = fun(X) ->
                   element(1, X) == Key
           end,
