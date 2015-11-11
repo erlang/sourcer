@@ -130,32 +130,31 @@ one_step_expand([], Ctx, R, true) ->
 one_step_expand([], Ctx, R, false) ->
     {ok, lists:reverse(R), Ctx};
 one_step_expand([{macro,_}=H|T], Context, Acc, More) ->
-
-    %% TODO handle macro arguments!
-
-    Def = get_macro_def(H, Context),
+    Arity = detect_macro_arity(T),
+    Def = get_macro_def(H, Arity, Context),
     More2 = More orelse has_macros(Def),
     Repl = case Def of
                [] ->
                    [H];
                _ ->
-                   M=hd(Def),
-                   {macro, #{value:=V}}=M,
+                   {_,_,_,V}=hd(Def),
                    lists:reverse(V)
            end,
     one_step_expand(T, Context, Repl++Acc, More2);
 one_step_expand([H|T], Context, Acc, More) ->
     one_step_expand(T, Context, [H|Acc], More).
 
-%% TODO macro arguments!
-get_macro_def({macro, #{name:=Name}}, #context{macros=M}) ->
+get_macro_def({macro, #{name:=Name}}, Arity, #context{macros=M}) ->
     Pred = fun
-              ({macro, #{name:=MyName}}) when MyName==Name ->true;
-              (_)->false
+              ({MyName, MyArity, _, _}) when MyName==Name, MyArity==-1;
+                                             MyName==Name, MyArity==Arity ->
+                   true;
+              (_X) ->
+                   false
            end,
     Defs = lists:filter(Pred, M),
     Defs;
-get_macro_def(_, _) ->
+get_macro_def(_, _, _) ->
     [].
 
 has_macros(Def) ->
@@ -163,6 +162,10 @@ has_macros(Def) ->
 
 has_macros_1(Def) ->
     lists:any(fun({macro, _})->true; (_)-> false end, Def).
+
+%% TODO
+detect_macro_arity(_Ts) ->
+    0.
 
 %% TODO set 'active' attribute on form, if
 do_parse_form([{atom,_}|_]=Ts, Context, Comments) ->
@@ -546,11 +549,23 @@ has_macros_test_() ->
 get_macro_def_test_() ->
     [
      ?_assertMatch([],
-                   get_macro_def({macro, #{name=>z}}, #context{macros=[{macro, #{name=>x}}]})),
-     ?_assertMatch([{macro, #{name:=z, value:=[{atom, r}]}}],
-                   get_macro_def({macro, #{name=>z}}, #context{macros=[{macro, #{name=>z, value=>[{atom, r}]}}]})),
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{macros=[{x, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, none, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, _, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
      ?_assertMatch([],
-                   get_macro_def({macro, #{name=>z}}, #context{}))
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, 2, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, _, [{atom, r}]},{z, 1, _, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}, {z, 1, [], [{atom, r}]}]})),
+     ?_assertMatch([],
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{}))
      ].
 
 one_step_expand_test_() ->
@@ -560,15 +575,23 @@ one_step_expand_test_() ->
 expand_macros_test_() ->
     [
      ?_assertMatch([{atom, 0}, {macro, #{name:=x}}, {atom, 1}],
-                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}], #context{})),
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{})),
      ?_assertMatch([{atom, 0}, {macro, #{name:=x}}, {atom, 1}],
-                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}], #context{macros=[{macro, #{name=>z, value=>[{atom, r}]}}]})),
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
      ?_assertMatch([{atom, 0}, {atom, r}, {atom, 1}],
-                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}], #context{macros=[{macro, #{name=>x, value=>[{atom, r}]}}]})),
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{x, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{atom, 0}, {atom, r}, {atom, q}, {atom, 1}],
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{x, -1, none, [{atom, r}, {atom, q}]}]})),
      ?_assertMatch([{atom, 0}, {atom, 1}],
-                   expand_macros([{atom, 0}, {atom, 1}], #context{})),
+                   expand_macros([{atom, 0}, {atom, 1}],
+                                 #context{})),
      ?_assertMatch([],
-                   expand_macros([], #context{}))
+                   expand_macros([],
+                                 #context{}))
      ].
 
 %%%%%%%
