@@ -89,7 +89,6 @@ convert_tokens_3_({K,A,V}, Ofs) ->
 %%             convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
 %%     end;
 
--spec fix_macro_tokens([any()]) -> [any()].
 fix_macro_tokens(Toks) ->
     fix_macro_tokens(Toks, []).
 
