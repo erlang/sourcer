@@ -92,7 +92,9 @@ tokens_test_() ->
                     {0,4,3}},
                    test_scan("try")),
      ?_assertMatch({error, {{0,1},erl_scan_local,{base,99}},{0,3}},
-                   test_scan("99#3"))
+                   test_scan("99#3")),
+     ?_assertMatch({error, {{0,2},erl_scan_local,{illegal,character}},{0,8}},
+                   test_scan("\"\\x{aaa"))
     ].
 
 scanner_test_() ->

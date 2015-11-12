@@ -102,11 +102,10 @@ compact_comments(L) ->
     Fun = fun({comment, #{value:=C}}, Acc) -> [skip_percent(C)|Acc] end,
     {comments, element(2, hd(L)), lists:reverse(lists:foldl(Fun, [], L)), Level}.
 
-comment_level({comment, #{text:="%%%%"++_}}) -> 4;
-comment_level({comment, #{text:="%%%"++_}}) -> 3;
-comment_level({comment, #{text:="%%"++_}}) -> 2;
-comment_level({comment, #{text:="%"++_}}) -> 1;
-comment_level(_) -> 0.
+comment_level({comment, #{value:="%%%%"++_}}) -> 4;
+comment_level({comment, #{value:="%%%"++_}}) -> 3;
+comment_level({comment, #{value:="%%"++_}}) -> 2;
+comment_level({comment, #{value:="%"++_}}) -> 1.
 
 skip_percent("%"++L) ->
     skip_percent(L);
@@ -153,9 +152,7 @@ get_macro_def({macro, #{name:=Name}}, Arity, #context{macros=M}) ->
                    false
            end,
     Defs = lists:filter(Pred, M),
-    Defs;
-get_macro_def(_, _, _) ->
-    [].
+    Defs.
 
 has_macros(Def) ->
     lists:any(fun({macro, #{value:=V}})->has_macros_1(V); (_)-> false end, Def).
@@ -163,9 +160,11 @@ has_macros(Def) ->
 has_macros_1(Def) ->
     lists:any(fun({macro, _})->true; (_)-> false end, Def).
 
-%% TODO
-detect_macro_arity(_Ts) ->
-    0.
+detect_macro_arity([{'(',_}|_]=Ts) ->
+    M = sourcer_util:split_at_comma(sourcer_util:middle(Ts)),
+    length(M);
+detect_macro_arity(_) ->
+    -1.
 
 %% TODO set 'active' attribute on form, if
 do_parse_form([{atom,_}|_]=Ts, Context, Comments) ->
@@ -544,6 +543,14 @@ has_macros_test_() ->
                    has_macros_1([{atom, 0},{macro, 1}])),
      ?_assertEqual(false,
                    has_macros_1([]))
+     ].
+
+detect_macro_arity_test_() ->
+    [
+     ?_assertEqual(-1, detect_macro_arity(scan("hello"))),
+     ?_assertEqual(0, detect_macro_arity(scan("()"))),
+     ?_assertEqual(1, detect_macro_arity(scan("(hello)"))),
+     ?_assertEqual(2, detect_macro_arity(scan("(hello,h(1,2))")))
      ].
 
 get_macro_def_test_() ->
