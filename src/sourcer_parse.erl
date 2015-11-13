@@ -23,7 +23,7 @@
 -include("sourcer.hrl").
 -include("sourcer_parse.hrl").
 
--spec string(string(), context()) -> {'ok', {#{}, context()}} | {'error', any()}.
+-spec string(string(), context()) -> {'ok', {[sourcer:form()], context()}} | {'error', any()}.
 string(D, Context) when is_list(D), is_record(Context, context) ->
     case sourcer_scan:string(D) of
         {ok, Toks, _} ->
@@ -32,11 +32,10 @@ string(D, Context) when is_list(D), is_record(Context, context) ->
             _Err
     end.
 
--spec tokens(sourcer:tokens(), context()) -> {#{}, context()}.
+-spec tokens(sourcer:tokens(), context()) -> {[sourcer:form()], context()}.
 tokens(Toks, Context) ->
     Raw = split_at_dot(Toks),
-    {Parsed, NewContext} = parse_forms(Raw, Context),
-    {#{all=>Toks, rawForms=>Raw, forms=>Parsed}, NewContext}.
+    parse_forms(Raw, Context).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -45,7 +44,8 @@ parse_forms(Toks, Context) ->
 
 %% keep track of macro context
 parse_form(Ts, Context) ->
-    {TopComments, Ts1} = extract_top_comments(Ts),
+    Ts0 = expand_macros(Ts, Context),
+    {TopComments, Ts1} = extract_top_comments(Ts0),
     Ts2 = sourcer_util:filter_tokens(Ts1),
     {Form, Ctx} = do_parse_form(Ts2, Context, []),
     Form2 = update_attributes(Form,
@@ -102,16 +102,69 @@ compact_comments(L) ->
     Fun = fun({comment, #{value:=C}}, Acc) -> [skip_percent(C)|Acc] end,
     {comments, element(2, hd(L)), lists:reverse(lists:foldl(Fun, [], L)), Level}.
 
-comment_level({comment, #{text:="%%%%"++_}}) -> 4;
-comment_level({comment, #{text:="%%%"++_}}) -> 3;
-comment_level({comment, #{text:="%%"++_}}) -> 2;
-comment_level({comment, #{text:="%"++_}}) -> 1;
-comment_level(_) -> 0.
+comment_level({comment, #{value:="%%%%"++_}}) -> 4;
+comment_level({comment, #{value:="%%%"++_}}) -> 3;
+comment_level({comment, #{value:="%%"++_}}) -> 2;
+comment_level({comment, #{value:="%"++_}}) -> 1.
 
 skip_percent("%"++L) ->
     skip_percent(L);
 skip_percent(L) ->
     L.
+
+%% TODO includes and include_lib!
+expand_macros(Tokens, Context) ->
+    case one_step_expand(Tokens, Context) of
+        {ok, Toks, _Ctx} ->
+            Toks;
+        {more, Toks, Ctx} ->
+            expand_macros(Toks, Ctx)
+    end.
+
+one_step_expand(Tokens, Context) ->
+    one_step_expand(Tokens, Context, [], false).
+
+one_step_expand([], Ctx, R, true) ->
+    {more, lists:reverse(R), Ctx};
+one_step_expand([], Ctx, R, false) ->
+    {ok, lists:reverse(R), Ctx};
+one_step_expand([{macro,_}=H|T], Context, Acc, More) ->
+    Arity = detect_macro_arity(T),
+    Def = get_macro_def(H, Arity, Context),
+    More2 = More orelse has_macros(Def),
+    Repl = case Def of
+               [] ->
+                   [H];
+               _ ->
+                   {_,_,_,V}=hd(Def),
+                   lists:reverse(V)
+           end,
+    one_step_expand(T, Context, Repl++Acc, More2);
+one_step_expand([H|T], Context, Acc, More) ->
+    one_step_expand(T, Context, [H|Acc], More).
+
+get_macro_def({macro, #{name:=Name}}, Arity, #context{macros=M}) ->
+    Pred = fun
+              ({MyName, MyArity, _, _}) when MyName==Name, MyArity==-1;
+                                             MyName==Name, MyArity==Arity ->
+                   true;
+              (_X) ->
+                   false
+           end,
+    Defs = lists:filter(Pred, M),
+    Defs.
+
+has_macros(Def) ->
+    lists:any(fun({macro, #{value:=V}})->has_macros_1(V); (_)-> false end, Def).
+
+has_macros_1(Def) ->
+    lists:any(fun({macro, _})->true; (_)-> false end, Def).
+
+detect_macro_arity([{'(',_}|_]=Ts) ->
+    M = sourcer_util:split_at_comma(sourcer_util:middle(Ts)),
+    length(M);
+detect_macro_arity(_) ->
+    -1.
 
 %% TODO set 'active' attribute on form, if
 do_parse_form([{atom,_}|_]=Ts, Context, Comments) ->
@@ -123,12 +176,12 @@ do_parse_form([{'-',_}|_]=Ts, Context, Comments) ->
 do_parse_form(Ts, Context, _Comments) ->
     {parse_unknown(Ts), Context}.
 
-get_context({'define', _, {_,#{value:=Name}}, Arity, _, _}, #context{defines=Defs, macros=Macros}=Ctx) ->
+get_context({'define', _, {_,#{value:=Name}}, Arity, Args, Value}, #context{defines=Defs, macros=Macros}=Ctx) ->
     Ctx#context{defines=sets:add_element(Name, Defs),
-                macros=[{Name, Arity}|Macros]};
+                macros=[{Name, Arity, Args, Value}|Macros]};
 get_context({'undef', _, {_, #{value:=Name}}}, #context{defines=Defs, macros=Macros}=Ctx) ->
     Ctx#context{defines=sets:del_element(Name, Defs),
-                macros=lists:filter(fun({X, _})->
+                macros=lists:filter(fun({X, _, _, _})->
                                             X =/= Name
                                     end,
                                     Macros)};
@@ -168,19 +221,17 @@ parse_attribute([{'-', Pos},{atom,#{value:='undef'}},{'(', _},Name,{')',_}], Com
     {undef, Pos#{comments=>Comments}, Name};
 parse_attribute([{'-', Pos},{atom,#{value:='define'}}|Ts], Comments) ->
     [Name | Args0] = sourcer_util:middle(Ts),
-    {Args, Value} = case Args0 of
-                        [] ->
-                            [];
+    {Args, Arity, Value} = case Args0 of
                         [{'(',_}|_] ->
                             {A,B} = sourcer_util:split_at_brace(Args0),
+                            Args1 = [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
                             {
-                             [hd(X) || X<-sourcer_util:split_at_comma(sourcer_util:middle(A))],
+                             Args1, length(Args1),
                              case B of [] -> []; _ -> tl(B) end
                             };
                         _ ->
-                            {[], tl(Args0)}
+                            {none, -1, tl(Args0)}
                     end,
-    Arity = length(Args),
     {define, Pos#{comments=>Comments}, Name, Arity, Args, Value};
 parse_attribute([{'-', Pos},{atom,#{value:='record'}}|Ts], Comments) ->
     [{atom, #{value:=Name}}, {',', _} | Def] = sourcer_util:middle(Ts),
@@ -358,6 +409,18 @@ is_active_define({'not', A}, Defs) ->
 is_active_define(A, Defs) ->
     sets:is_element(A, Defs) andalso not sets:is_element({'not', A}, Defs).
 
+%% predef_macros(File) ->
+%%     Machine = list_to_atom(erlang:system_info(machine)),
+%%     Anno = #{line=>1},
+%%     dict:from_list([
+%%                     {{atom, 'FILE'},           {none, [{string, Anno, File}]}},
+%%                     {{atom, 'LINE'},           {none, [{integer, Anno, 1}]}},
+%%                     {{atom, 'MODULE'},          undefined},
+%%                     {{atom, 'MODULE_STRING'},   undefined},
+%%                     {{atom, 'MACHINE'},        {none, [{atom, Anno, Machine}]}},
+%%                     {{atom, Machine},          {none, [{atom, Anno, true}]}}
+%%                    ]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -ifdef(TEST).
@@ -390,14 +453,14 @@ extract_top_comments_test_() ->
                    extract_top_comments(scan("%a\n\n%b\n%%c\nhello")))
     ].
 
- split_at_semicolon_name_test_() ->
-     [
-      ?_assertMatch([[{atom, #{value:=a}},
-                      {atom, #{value:=b}},
-                      {atom, #{value:=c}}]],
-                    split_at_semicolon_name([{atom, #{value=>a}},
-                                                           {atom, #{value=>b}},
-                                                           {atom, #{value=>c}}])),
+split_at_semicolon_name_test_() ->
+    [
+     ?_assertMatch([[{atom, #{value:=a}},
+                     {atom, #{value:=b}},
+                     {atom, #{value:=c}}]],
+                   split_at_semicolon_name([{atom, #{value=>a}},
+                                            {atom, #{value=>b}},
+                                            {atom, #{value=>c}}])),
      ?_assertMatch([[{atom, #{value:=a}},
                      {';',_},
                      {atom, #{value:=b}},
@@ -412,7 +475,7 @@ extract_top_comments_test_() ->
      ?_assertMatch([[{atom, #{value:=a}},{'(',_},{atom, #{value:=b}},{')',_},{';',_},
                      {atom, #{value:=c}},{'(',_},{atom, #{value:=d}},{')',_}]],
                    split_at_semicolon_name(scan("a(b);c(d)")))
-     ].
+    ].
 
 split_at_semicolon_test_() ->
     [
@@ -484,10 +547,83 @@ parse_clause_test_() ->
                    parse_clause(scan("foo(x,y)->a,b")))
     ].
 
+has_macros_test_() ->
+    [
+     ?_assertEqual(false,
+                   has_macros_1([{atom, 0}])),
+     ?_assertEqual(true,
+                   has_macros_1([{atom, 0},{macro, 1}])),
+     ?_assertEqual(false,
+                   has_macros_1([]))
+     ].
+
+detect_macro_arity_test_() ->
+    [
+     ?_assertEqual(-1, detect_macro_arity(scan("hello"))),
+     ?_assertEqual(0, detect_macro_arity(scan("()"))),
+     ?_assertEqual(1, detect_macro_arity(scan("(hello)"))),
+     ?_assertEqual(2, detect_macro_arity(scan("(hello,h(1,2))")))
+     ].
+
+get_macro_def_test_() ->
+    [
+     ?_assertMatch([],
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{macros=[{x, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, none, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, _, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([],
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, 2, none, [{atom, r}]}]})),
+     ?_assertMatch([{z, -1, _, [{atom, r}]},{z, 1, _, [{atom, r}]}],
+                   get_macro_def({macro, #{name=>z}}, 1,
+                                 #context{macros=[{z, -1, none, [{atom, r}]}, {z, 1, [], [{atom, r}]}]})),
+     ?_assertMatch([],
+                   get_macro_def({macro, #{name=>z}}, -1,
+                                 #context{}))
+     ].
+
+one_step_expand_test_() ->
+    [
+     ].
+
+expand_macros_test_() ->
+    [
+     ?_assertMatch([{atom, 0}, {macro, #{name:=x}}, {atom, 1}],
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{})),
+     ?_assertMatch([{atom, 0}, {macro, #{name:=x}}, {atom, 1}],
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{z, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{atom, 0}, {atom, r}, {atom, 1}],
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{x, -1, none, [{atom, r}]}]})),
+     ?_assertMatch([{atom, 0}, {atom, r}, {atom, q}, {atom, 1}],
+                   expand_macros([{atom, 0}, {macro, #{name=>x}}, {atom, 1}],
+                                 #context{macros=[{x, -1, none, [{atom, r}, {atom, q}]}]})),
+     ?_assertMatch([{atom, 0}, {atom, 1}],
+                   expand_macros([{atom, 0}, {atom, 1}],
+                                 #context{})),
+     ?_assertMatch([],
+                   expand_macros([],
+                                 #context{}))
+     ].
+
 %%%%%%%
 
 scan(D) ->
     {ok, Ts, _} = sourcer_scan:string(D),
     Ts.
 
+%% get_epp_tokens(_N) ->
+%%     %epp:parse_file(N),
+%%     ok.
+
 -endif.
+
+
+
