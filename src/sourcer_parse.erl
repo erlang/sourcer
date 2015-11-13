@@ -409,6 +409,18 @@ is_active_define({'not', A}, Defs) ->
 is_active_define(A, Defs) ->
     sets:is_element(A, Defs) andalso not sets:is_element({'not', A}, Defs).
 
+%% predef_macros(File) ->
+%%     Machine = list_to_atom(erlang:system_info(machine)),
+%%     Anno = #{line=>1},
+%%     dict:from_list([
+%%                     {{atom, 'FILE'},           {none, [{string, Anno, File}]}},
+%%                     {{atom, 'LINE'},           {none, [{integer, Anno, 1}]}},
+%%                     {{atom, 'MODULE'},          undefined},
+%%                     {{atom, 'MODULE_STRING'},   undefined},
+%%                     {{atom, 'MACHINE'},        {none, [{atom, Anno, Machine}]}},
+%%                     {{atom, Machine},          {none, [{atom, Anno, true}]}}
+%%                    ]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -ifdef(TEST).
@@ -606,6 +618,10 @@ expand_macros_test_() ->
 scan(D) ->
     {ok, Ts, _} = sourcer_scan:string(D),
     Ts.
+
+%% get_epp_tokens(_N) ->
+%%     %epp:parse_file(N),
+%%     ok.
 
 -endif.
 
