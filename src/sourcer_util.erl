@@ -1,4 +1,4 @@
-%%% Copyright 2015 Vlad Dumitrescu
+%%% Copyright 2015-2016 Vlad Dumitrescu
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -88,6 +88,7 @@ split_at_comma([{B, _}=H|T], Acc, Crt) ->
     end.
 
 -spec token_pair(atom()) -> sourcer:close_brace() | 'none'.
+
 token_pair('(') ->
     ')';
 token_pair('[') ->
@@ -100,14 +101,15 @@ token_pair(X) when is_atom(X) ->
     none.
 
 -spec filter_tokens(sourcer:tokens()) -> sourcer:tokens().
+
 filter_tokens(Toks) ->
     lists:filter(fun filter_token/1, Toks).
 
 -spec filter_token(_) -> boolean().
+
 filter_token({white_space, _}) ->
     false;
 filter_token({comment, _}) ->
     false;
 filter_token(_) ->
     true.
-

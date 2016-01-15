@@ -7,3 +7,4 @@ doc/*
 !doc/overview.edoc
 otp_18.1.plt
 .rebar/
+test_priv/test1.erl.out

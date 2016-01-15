@@ -1,5 +1,5 @@
 %% coding: utf-8
-%% Description: TODO: Add description to sourcer_scanner_tests
+
 -module(sourcer_scan_tests).
 
 %%
@@ -92,7 +92,9 @@ tokens_test_() ->
                     {0,4,3}},
                    test_scan("try")),
      ?_assertMatch({error, {{0,1},erl_scan_local,{base,99}},{0,3}},
-                   test_scan("99#3"))
+                   test_scan("99#3")),
+     ?_assertMatch({error, {{0,2},erl_scan_local,{illegal,character}},{0,8}},
+                   test_scan("\"\\x{aaa"))
     ].
 
 scanner_test_() ->
@@ -217,3 +219,4 @@ test_scan(S) ->
 
 test_scan(S, L, C, O) ->
     sourcer_scan:string(S, {L, C, O}).
+

@@ -1,4 +1,4 @@
-%%% Copyright 2015 Vlad Dumitrescu
+%%% Copyright 2015-2016 Vlad Dumitrescu
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -21,18 +21,19 @@
 
 -export([
          string/1,
-         string/2
+         string/2,
+convert_tokens_2/2
         ]).
 
 -include("sourcer.hrl").
 
--spec string(string()) -> {'ok', sourcer:tokens(), sourcer:location()}
-                              | {'error', sourcer:location()}.
+%% -spec string(string()) -> {'ok', sourcer:tokens(), sourcer:location()}
+%%                               | {'error', sourcer:location()}.
 string(D) ->
     string(D, {0, 1, 0}).
 
--spec string(string(), sourcer:location()) -> {'ok', sourcer:tokens(), sourcer:location()}
-                                                  | {'error', sourcer:location()}.
+%% -spec string(string(), sourcer:location()) -> {'ok', sourcer:tokens(), sourcer:location()}
+%%                                                   | {'error', sourcer:location()}.
 string(String, {L, C, O}) ->
     case string_2(String, {L, C, O}) of
         {ok, _, _}=R ->
@@ -57,7 +58,7 @@ string_2(D, {L, C, O}) ->
             _Err
     end.
 
--spec convert_tokens_2([tuple()], sourcer:offset()) -> {[sourcer:token()], sourcer:offset()}.
+%% -spec convert_tokens_2([tuple()], sourcer:offset()) -> {[sourcer:token()], sourcer:offset()}.
 convert_tokens_2(Toks, Ofs) when is_list(Toks) ->
     lists:mapfoldl(fun convert_tokens_2_/2, Ofs, Toks).
 
@@ -77,8 +78,7 @@ convert_tokens_3_({K,A,V}, Ofs) ->
     NewAttrs = maps:from_list([{length,Length},{offset,Ofs},{value,V}|A]),
     {{K,NewAttrs#{text=>NewText}}, Ofs+Length}.
 
-%% TODO: split "dot+space" in two tokens
-%% convert_tokens_2([{dot, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
+%% TODO split_dot_space_token([{dot, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
 %%     %% erl_scan conflates the dot with following whitespace.
 %%     T = #token{kind=dot, attrs=#attrs{line=L, offset=Ofs, length=1, text=[hd(Txt)]}},
 %%     case Txt of
@@ -89,7 +89,6 @@ convert_tokens_3_({K,A,V}, Ofs) ->
 %%             convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
 %%     end;
 
--spec fix_macro_tokens([any()]) -> [any()].
 fix_macro_tokens(Toks) ->
     fix_macro_tokens(Toks, []).
 

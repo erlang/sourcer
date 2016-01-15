@@ -1,4 +1,4 @@
-%%% Copyright 2015 Vlad Dumitrescu
+%%% Copyright 2015-2016 Vlad Dumitrescu
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 %% XXX structure around ifdefs!?
 
 %% Gather the relevant information about a module, from each form.
--spec analyze_module(#{}) -> #module{}.
+-spec analyze_module([form()]) -> #module{}.
 analyze_module(Mod) ->
     Forms = group_forms(Mod),
 
@@ -57,7 +57,7 @@ analyze_module(Mod) ->
 %% (modules, functions, macros, variables, records, record fields)
 %% We need to scan for macros separately so that we can detect overlapped references
 %% like '?M:f'
--spec analyze_references([token()]) -> [ref()].
+-spec analyze_references([sourcer:token()]) -> [ref()].
 analyze_references(Toks) when is_list(Toks) ->
     M = analyze_macro_references(Toks, []),
     R = analyze_references(Toks, []),
@@ -132,10 +132,10 @@ mk_loc(Start, End) ->
 module_keys() ->
     [
      module, include, include_lib, function, record, type, opaque,
-     export, import
+     export, import, export_type
     ].
 
-group_forms(#{forms:=Forms})  ->
+group_forms(Forms)  ->
     group_forms(module_keys(), Forms, []).
 
 group_forms(_, [], Acc) ->

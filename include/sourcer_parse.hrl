@@ -1,28 +1,30 @@
-
-%% TODO: maybe make this recursive, to be easy to push/pop new stuff?
-%% for example, inside an ifdef.
+-type source_encoding() :: 'latin1' | 'utf8'.
 
 -record(context, {
+                  %% the content provider for retrieving file content
+                  provider = undefined :: sourcer_content_provider:maybe_provider(),
+
                   %% location (path) of current file
-                  %% TODO what about working copies (i.e.
-                  %% code in a buffer not saved yet)?
-                  file,
+                  file_name = "",
+
+                  default_encoding = utf8 :: source_encoding(),
 
                   %% from compiler options
-                  include_dirs=[],
+                  include_dirs = [],
 
                   %% currently defined macros with arity
                   %% initialized from compiler options
-                  macros=[],
+                  macros = [],
 
                   %% macros defined/undefined at this point
-                  defines=sets:new(),
+                  defines = sets:new(),
 
                   %% ifdef/ifndef situation at this point
-                  active=[],
+                  active = [],
 
                   %% names of files included so far
-                  included=[]
+                  included = []
                  }).
 
 -type context() :: #context{}.
+

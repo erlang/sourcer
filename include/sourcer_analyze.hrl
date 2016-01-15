@@ -1,7 +1,3 @@
--type attrs() :: [{atom(),term()}].
--type token() :: {atom(), attrs()} | {atom(), attrs(), term()}.
--type location() :: map().
-
 %% TODO will have to think about this
 %% this reflects the entities directly defined in this module or header
 -record(module, {
@@ -30,6 +26,7 @@
 -record(record_id, {module::atom(), name::atom()}).
 -record(recordfield_id, {record::#record_id{}, name::atom()}).
 
+-type location() :: map().
 
 -record(typeref, {loc::location(), id::#type_id{}}).
 -record(moduleref, {loc::location(), id::atom()}).

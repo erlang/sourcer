@@ -29,10 +29,12 @@ split_at_brace_test_() ->
                      {atom,#{value:=c}},{')',_},{atom,#{value:=d}},{')',_}],
                     [{atom,#{value:=e}}]},
                    sourcer_util:split_at_brace(scan("(a(b c)d)e"))),
-     ?_assertMatch({[{'(',_},{atom,#{value:=a}},{',',_},{'[',_},{atom,#{value:=b}},{',',_},
-                     {atom,#{value:=c}},{']',_},{',',_},{atom,#{value:=d}},{')',_}],
+     ?_assertMatch({[{'{',_},{atom,#{value:=a}},{',',_},{'[',_},{atom,#{value:=b}},{',',_},
+                     {atom,#{value:=c}},{']',_},{',',_},{atom,#{value:=d}},{'}',_}],
                     [{atom,#{value:=e}}]},
-                   sourcer_util:split_at_brace(scan("(a,[b,c],d)e"))),
+                   sourcer_util:split_at_brace(scan("{a,[b,c],d}e"))),
+     ?_assertMatch({[{'<<',1}], []},
+                   sourcer_util:split_at_brace([{'<<',1}])),
      ?_assertMatch({[], []},
                    sourcer_util:split_at_brace([]))
     ].
