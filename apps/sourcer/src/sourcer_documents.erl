@@ -45,7 +45,7 @@ parse_file(File, Text) ->
 			unicode:characters_to_list(File), 
 			TText,
 			".", false, false) of
-		{ok, {model, AST, _}, _, Refs} ->
+		{ok, {model, AST, _}, Refs} ->
 			io:format("00* ~p~n", [Refs]),
 			{Lines, _} = get_line_info(TText),
 			io:format("000 ~p~n", [Lines]),

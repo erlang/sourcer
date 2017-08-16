@@ -108,8 +108,8 @@ reply(Cmd, From, R) ->
 
 do_cmd(initial_scan, {ScannerName, ModuleFileName, InitialText, StateDir, UseCache}, _Module) ->
     ?D({initial_scan, ScannerName, length(InitialText)}),
-    {Cached, Module1} = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir, UseCache),
-    {{ok, Cached}, Module1};
+    Module1 = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir, UseCache),
+    {ok, Module1};
 do_cmd(dump_module, [], Module) ->
     {Module, Module};
 do_cmd(get_token_at, Offset, Module) ->

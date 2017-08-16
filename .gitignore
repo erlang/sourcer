@@ -1,3 +1,5 @@
 _build
 erl_crash.dump
+*.refs
+*.scan
 

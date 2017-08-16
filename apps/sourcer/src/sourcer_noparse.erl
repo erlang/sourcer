@@ -52,10 +52,8 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir, UseCache,
                            {Model, Refs}
                    end,
         CacheFileName = BaseName ++ ".noparse",
-        {Cached, {Model, Refs}} = erlide_cache:check_and_renew_cached(
-                                    ModuleFileName, CacheFileName, ?CACHE_VERSION,
-                                    RenewFun, UseCache),
-        {ok, Model, Cached, Refs}
+        {Model, Refs} = RenewFun(ModuleFileName),
+        {ok, Model, Refs}
     catch
         error:Reason ->
             {error, Reason, erlang:get_stacktrace()}
@@ -114,7 +112,7 @@ remove_cache_files(ScannerName, StateDir) ->
 get_tokens(ScannerName, ModuleFileName, InitialText, StateDir) ->
     case whereis(ScannerName) of
         undefined ->
-            {_Cached, Module} = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir, true),
+            Module = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir, true),
             erlide_scan_model:get_all_tokens(Module);
         _ ->
             erlide_scanner:get_tokens(ScannerName)

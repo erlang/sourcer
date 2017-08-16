@@ -80,10 +80,7 @@ get_otp_lib_structure(StateDir) ->
                end,
     VersionFileName = filename:join([code:root_dir()]),
     CacheName = filename:join(StateDir, "otp.structure"),
-    {_Cached, R} =
-        erlide_cache:check_and_renew_cached(VersionFileName, CacheName,
-                                            ?CACHE_VERSION, RenewFun, true),
-    ?D(_Cached),
+    R = RenewFun(VersionFileName),
     {ok, R}.
 
 get_app_group(Dir) ->
