@@ -1,0 +1,9 @@
+{application, sourcer,
+  [
+   {vsn, "0.2.0"},
+   {erlide_context, ide},
+   {registered,   []},
+   {applications, [kernel, stdlib]},
+   {env,          []}
+   ]}
+.

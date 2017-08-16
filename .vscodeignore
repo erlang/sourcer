@@ -1,0 +1,5 @@
+.vscode/**
+.gitignore
+erl_crash.dump
+
+.settings/**

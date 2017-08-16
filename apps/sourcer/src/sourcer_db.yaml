@@ -1,0 +1,45 @@
+- _ALL_:
+  - name_range: range
+  - def_range: range
+  - ref_ranges: [{file, [range]}]
+- file:
+  - * location: string
+  - is_library: boolean
+- module:
+  - * name: atom
+  - file: file
+  - includes: [file]
+- include:
+  - * file: file
+  - * target: file
+  - is_library: boolean
+- function:
+  - * module: module
+  - * name: atom
+  - * arity: integer
+  - is_exported: boolean
+- type:
+  - * module: module
+  - * name: atom
+  - * arity: integer
+  - is_exported: boolean
+- macro:
+  - * file: file
+  - * name: atom
+  - * arity: integer
+- record:
+  - * file: file
+  - * name: atom
+- field:
+  - * record: record
+  - * name: string
+- variable:
+  - * parent: function|macro
+  - * name: atom
+  - * index: integer # can be several independent
+- ifdef:
+  - * file: file
+  - * condition: macro
+  - * index: integer # can be several
+  - if_range: range
+  - else_range: range

@@ -1,0 +1,10 @@
+{application, lsp_server,
+  [
+   {vsn, "0.2.0"},
+   {erlide_context, ide},
+   {registered,   [lsp_server_sup, jsonrpc, lsp_server, lsp_client]},
+   {applications, [kernel, stdlib, jsx, getopt]},
+   {env,          []},
+   {mod, {lsp_server_app, []}}
+   ]}
+.
