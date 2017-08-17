@@ -10,7 +10,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 
 -include_lib("kernel/include/file.hrl").
 

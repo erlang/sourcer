@@ -6,7 +6,7 @@
 
 -export([parse/1]).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("erlide_token.hrl").
 -include("sourcer_noparse.hrl").
 -include("erlide_search.hrl").

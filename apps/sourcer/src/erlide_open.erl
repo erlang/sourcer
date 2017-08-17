@@ -29,7 +29,7 @@
 %%-define(DEBUG, 1).
 %%-define(IO_FORMAT_DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("erlide_open.hrl").
 -include("include/erlide_token.hrl").
 

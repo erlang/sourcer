@@ -12,7 +12,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("include/erlide_token.hrl").
 
 

@@ -17,7 +17,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 
 -define(CACHE_VERSION, 2).
 

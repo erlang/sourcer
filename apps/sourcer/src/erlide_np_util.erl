@@ -4,7 +4,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("sourcer_noparse.hrl").
 -include("erlide_token.hrl").
 

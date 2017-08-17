@@ -10,7 +10,7 @@
 		 get_upto_str/2 ,split_lines/1]).
 -export([get_auto_imported/1, add_auto_imported/1]).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 
 %% a string split that keeps the separators at the end of the parts
 split(String, Sep) ->

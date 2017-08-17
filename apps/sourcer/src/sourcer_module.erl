@@ -15,7 +15,7 @@
          contentChange/4
         ]).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 
 %% For now we have a simple content model: a string.
 

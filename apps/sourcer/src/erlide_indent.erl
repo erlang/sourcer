@@ -20,7 +20,7 @@
 %% -define(IO_FORMAT_DEBUG, 1).
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("include/erlide_token.hrl").
 
 %% TODO: change into multiples of IndentW

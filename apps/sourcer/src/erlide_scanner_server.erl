@@ -9,7 +9,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("erlide_scanner_server.hrl").
 
 %%
@@ -80,7 +80,7 @@ loop(Module, Refs) ->
             NewModule = cmd(Cmd, From, Args, Module),
             ?MODULE:loop(NewModule, Refs);
         Msg ->
-            erlide_log:log({scanner, Module#module.name, unexpected_message, Msg}),
+            %erlide_log:log({scanner, Module#module.name, unexpected_message, Msg}),
             ?MODULE:loop(Module, Refs)
     end.
 

@@ -11,7 +11,7 @@
 
 %% -define(DEBUG, 1).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("erlide_token.hrl").
 -include("erlide_scanner_server.hrl").
 
@@ -117,7 +117,7 @@ substr(Text, Start, Length) ->
 replace_between_lines(From, Length, With, Lines) ->
     case erlide_scan_util:find_line_w_offset(From, Lines) of
         not_found ->
-            erlide_log:log({not_found, "erlide_scan_util:find_line_w_offset", From, Lines}),
+            %erlide_log:log({not_found, "erlide_scan_util:find_line_w_offset", From, Lines}),
             ok;
         {LineNo1, Pos1, _Length1, Line1, Beyond1} ->
             ?D({LineNo1, Pos1, _Length1, Line1, Beyond1}),
@@ -149,7 +149,7 @@ replace_between_lines(From, Length, With, Lines) ->
                     {LineNo1, NOldLines, WLines,
                      replace_between(LineNo1, NOldLines, WLines, Lines)};
                 _ ->
-                    erlide_log:log({not_found_2, "erlide_scan_util:find_line_w_offset", From+Length, Lines}),
+                    %erlide_log:log({not_found_2, "erlide_scan_util:find_line_w_offset", From+Length, Lines}),
                     ok
             end
     end.

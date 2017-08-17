@@ -19,7 +19,7 @@
 -define(XREF, erlide_xref).
 
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 
 start() ->
     start(whereis(?XREF)).

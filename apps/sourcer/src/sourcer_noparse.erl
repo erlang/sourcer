@@ -23,7 +23,7 @@
 
 -define(SERVER, sourcer_noparse).
 
--include("include/dbglog.hrl").
+-include("dbglog.hrl").
 -include("sourcer_noparse.hrl").
 -include("erlide_scanner_server.hrl").
 -include("erlide_search.hrl").
