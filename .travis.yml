@@ -1,0 +1,14 @@
+language: erlang
+otp_release:
+   - 20.0
+install:
+  - echo "skip 'rebar get-deps'"
+script:
+  - chmod u+x rebar3
+  - ./rebar3 do compile,eunit
+  - ./rebar3 coveralls send
+  - ./rebar3 xref || true
+  - echo wget http://download.erlide.org/tools/otp_20.0.plt
+  - echo mv otp_20.0.plt .rebar/sourcer_20.0_plt
+  - echo ./rebar3 dialyze
+

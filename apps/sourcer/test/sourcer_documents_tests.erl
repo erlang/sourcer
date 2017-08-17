@@ -64,21 +64,21 @@ parse_file_test_() ->
         ?_assertEqual(TextLines, Chunks)
     ].
 
-get_element_test_() ->
+get_element_test_000() ->
     Text = text(),
     {ok, AST, Refs, Lines} = sourcer_documents:parse_file("foo1", Text),
     Open = [{<<"foo">>, Text, {AST, Refs, Lines}}],
     [
-        ?_assertMatch([], 
+        ?_assertMatch([],
                         sourcer_documents:get_element(Open, <<"foo">>, #{line=>0, character=>0})
                     ),
-        ?_assertMatch({ref,{module_def,"foo"},1,13,module,-3,[],false}, 
+        ?_assertMatch({ref,{module_def,"foo"},1,13,module,-3,[],false},
                         sourcer_documents:get_element(Open, <<"foo">>, #{line=>1, character=>1})
                     ),
-        ?_assertMatch({ref,{function_def,bar,0},15,3,bar,0,[],false}, 
+        ?_assertMatch({ref,{function_def,bar,0},15,3,bar,0,[],false},
                         sourcer_documents:get_element(Open, <<"foo">>, #{line=>2, character=>1})
                     ),
-        ?_assertMatch({ref,{function_def,quz,1},36,3,quz,1,[],false}, 
+        ?_assertMatch({ref,{function_def,quz,1},36,3,quz,1,[],false},
                         sourcer_documents:get_element(Open, <<"foo">>, #{line=>5, character=>1})
                     )
     ].

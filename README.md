@@ -1,4 +1,4 @@
-# sourcer
+# Sourcer - language services for IDEs
 
 > This is a new incarnation of the sourcer project, the old code is still available on the `legacy` branch.
 
