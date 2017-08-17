@@ -11,6 +11,7 @@ main(Args) ->
 
             ok = application:load(lsp_server),
             ok = application:set_env(lsp_server, port, Port),
+            ok = application:set_env(lsp_server, implementor, sourcer),
 
             case application:ensure_all_started(lsp_server, permanent) of
                 {ok, _R} ->
