@@ -157,7 +157,7 @@ attrs_to_fn_x(Name0) ->
 scan(S) when is_list(S) ->
     scan(S, 0, []);
 scan(B) when is_binary(B) ->
-    scan(binary_to_list(B)).
+    scan(unicode:characters_to_list(B)).
 
 scan([$< | Rest0], I, Acc) -> % tag start, scan tag
     {ok, Rest1, Tag, D} = scan_tag(Rest0, 0, ""),

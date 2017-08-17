@@ -86,7 +86,7 @@ split_at(Text, End) ->
     end.
 
 split_lines(<<B/binary>>) ->
-    split_lines(binary_to_list(B));
+    split_lines(unicode:characters_to_list(B));
 split_lines(L) when is_list(L) ->
     split_lines(L, [], []).
 

@@ -81,7 +81,7 @@ get_module_refs(ScannerName, ModulePath, StateDir, UpdateSearchServer) ->
         _ ->
             InitialText = case file:read_file(ModulePath) of
                               {ok, InitialTextBin} ->
-                                  binary_to_list(InitialTextBin);
+                                  unicode:characters_to_list(InitialTextBin);
                               _ ->
                                   ""
                           end,
