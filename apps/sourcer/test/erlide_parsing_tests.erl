@@ -160,7 +160,7 @@ test_parse(S) ->
 test_reparse(S) ->
     erlide_scanner:create(testing),
     erlide_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
-                                "/not_used_either", false),
+                                "/not_used_either"),
     {ok, Model} = sourcer_noparse:reparse(testing, false),
     erlide_scanner:dispose(testing),
     Model.
@@ -168,7 +168,7 @@ test_reparse(S) ->
 test_replace_and_reparse(S, Offset, RemoveLength, NewText) ->
     erlide_scanner:create(testing),
     erlide_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
-                                "/not_used_either", false),
+                                "/not_used_either"),
     erlide_scanner:replace_text(testing, Offset, RemoveLength, NewText),
     {ok, Model} = sourcer_noparse:reparse(testing, false),
     erlide_scanner:dispose(testing),

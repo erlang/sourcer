@@ -17,7 +17,7 @@
 %% Exported Functions
 %%
 
--export([light_scan_string/2, scan_string/1, initial_scan_0/5, initial_scan/5,
+-export([light_scan_string/2, scan_string/1, initial_scan_0/4, initial_scan/4,
          get_token_at/2,
          create/1, addref/1, dispose/1, get_text/1,
          get_tokens/1, get_token_window/4,
@@ -42,18 +42,17 @@ scan_string(L) when is_list(L) ->
     M = erlide_scan_model:do_scan('', L),
     erlide_scan_model:get_all_tokens(M).
 
-initial_scan_0(ScannerName, ModuleFileName, Text, StateDir, UseCache) ->
-    CacheFileName = filename:join(StateDir, atom_to_list(ScannerName) ++ ".scan"),
+initial_scan_0(ScannerName, ModuleFileName, Text, _StateDir) ->
     RenewFun = fun(_F) -> erlide_scan_model:do_scan(ScannerName, Text) end,
     RenewFun(ModuleFileName).
 
 get_token_at(ScannerName, Offset) when is_atom(ScannerName), is_integer(Offset) ->
     erlide_scanner_server:server_cmd(ScannerName, get_token_at, Offset).
 
-initial_scan(ScannerName, ModuleFileName, InitialText, StateDir, UseCache)
+initial_scan(ScannerName, ModuleFileName, InitialText, StateDir)
   when is_atom(ScannerName), is_list(ModuleFileName), is_list(InitialText), is_list(StateDir) ->
     erlide_scanner_server:server_cmd(ScannerName, initial_scan,
-                                     {ScannerName, ModuleFileName, InitialText, StateDir, UseCache}).
+                                     {ScannerName, ModuleFileName, InitialText, StateDir}).
 
 create(ScannerName) when is_atom(ScannerName) ->
     erlide_scanner_server:spawn_server(ScannerName).

@@ -106,9 +106,9 @@ cmd(Cmd, From, Args, Module) ->
 reply(Cmd, From, R) ->
     From ! {Cmd, self(), R}.
 
-do_cmd(initial_scan, {ScannerName, ModuleFileName, InitialText, StateDir, UseCache}, _Module) ->
+do_cmd(initial_scan, {ScannerName, ModuleFileName, InitialText, StateDir}, _Module) ->
     ?D({initial_scan, ScannerName, length(InitialText)}),
-    Module1 = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir, UseCache),
+    Module1 = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir),
     {ok, Module1};
 do_cmd(dump_module, [], Module) ->
     {Module, Module};

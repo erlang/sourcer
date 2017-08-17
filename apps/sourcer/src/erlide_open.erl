@@ -64,7 +64,7 @@ get_external_include(FilePath, #open_context{externalIncludes=ExternalIncludes,
     ExtIncPaths = get_external_modules_files(ExternalIncludes, PathVars),
     get_ext_inc(ExtIncPaths, FilePath).
 
-get_otp_lib_structure(StateDir) ->
+get_otp_lib_structure(_StateDir) ->
     RenewFun = fun(_) ->
                        CodeLibs = code:get_path(),
                        LibDir = code:lib_dir(),
@@ -79,9 +79,9 @@ get_otp_lib_structure(StateDir) ->
                        R
                end,
     VersionFileName = filename:join([code:root_dir()]),
-    CacheName = filename:join(StateDir, "otp.structure"),
     R = RenewFun(VersionFileName),
     {ok, R}.
+
 
 get_app_group(Dir) ->
     case file:open(filename:join(Dir, "info"), [read]) of

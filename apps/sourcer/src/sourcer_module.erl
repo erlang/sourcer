@@ -32,7 +32,6 @@ contentChange(Pid, Offset, Length, Text) ->
 
 
 loop(State) ->
-    Name = State#state.name,
     receive
         stop ->
             ok;
@@ -46,8 +45,8 @@ loop(State) ->
             % erlide_log:logp("Module ~s:: ~p", [Name, _Msg]),
             Content1 = replace_text(State#state.content, Offset, Length, Text),
             loop(State#state{content=Content1});
-        Msg ->
-            %erlide_log:logp("Unknown message in module ~s: ~p", [Name, Msg]),
+        _Msg ->
+            %erlide_log:logp("Unknown message in module ~s: ~p", [State#state.name, _Msg]),
             loop(State)
     end.
 
