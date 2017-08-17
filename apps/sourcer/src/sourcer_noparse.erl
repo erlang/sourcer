@@ -9,7 +9,7 @@
 %%
 
 %% called from Java
--export([initial_parse/6, reparse/2, remove_cache_files/2]).
+-export([initial_parse/5, reparse/2]).
 
 %% called from Erlang
 -export([get_module_refs/4]).
@@ -21,7 +21,6 @@
 -define(DEBUG, 1).
 -define(IO_FORMAT_DEBUG, 1).
 
--define(CACHE_VERSION, 31).
 -define(SERVER, sourcer_noparse).
 
 -include("include/dbglog.hrl").
@@ -33,25 +32,22 @@
 %% API Functions
 %%
 
--spec initial_parse(atom(), string(), string(), string(), boolean(), boolean()) ->
-          {ok, #model{}, cached | renewing | dont_use_cache, [#ref{}]}
+-spec initial_parse(atom(), string(), string(), string(), boolean()) ->
+          {ok, #model{}, [#ref{}]}
               | {error, term(), term()}.
 
-initial_parse(ScannerName, ModuleFileName, InitialText, StateDir, UseCache,
+initial_parse(ScannerName, ModuleFileName, InitialText, StateDir, 
               UpdateSearchServer) ->
     try
-        ?D({ScannerName, ModuleFileName, UseCache, UpdateSearchServer}),
-        BaseName = filename:join(StateDir, atom_to_list(ScannerName)),
-        RefsFileName = BaseName ++ ".refs",
+        ?D({ScannerName, ModuleFileName, UpdateSearchServer}),
         RenewFun = fun(_F) ->
                            Tokens = get_tokens(ScannerName, ModuleFileName,
                                                InitialText, StateDir),
                            {Model, Refs} =
-                               do_parse(ScannerName, RefsFileName, Tokens, StateDir,
+                               do_parse(ScannerName, Tokens, StateDir,
                                         UpdateSearchServer),
                            {Model, Refs}
                    end,
-        CacheFileName = BaseName ++ ".noparse",
         {Model, Refs} = RenewFun(ModuleFileName),
         {ok, Model, Refs}
     catch
@@ -65,7 +61,7 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir, UseCache,
 reparse(ScannerName, UpdateSearchServer) ->
     try
         Tokens = erlide_scanner:get_tokens(ScannerName),
-        {Model, _Refs} = do_parse(ScannerName, "", Tokens, "", UpdateSearchServer),
+        {Model, _Refs} = do_parse(ScannerName, Tokens, "", UpdateSearchServer),
         {ok, Model}
     catch
         error:Reason ->
@@ -90,20 +86,9 @@ get_module_refs(ScannerName, ModulePath, StateDir, UpdateSearchServer) ->
                                   ""
                           end,
             {ok, _, _, Refs} = initial_parse(ScannerName, ModulePath, InitialText,
-                                             StateDir, true, UpdateSearchServer),
+                                             StateDir, UpdateSearchServer),
             Refs
     end.
-
--spec remove_cache_files(atom(), string) -> ok | {error, term()}.
-%% remove all cache files for an erlang module in erlide
-remove_cache_files(ScannerName, StateDir) ->
-    BaseName = filename:join(StateDir, atom_to_list(ScannerName)),
-    ScannerCacheFileName = BaseName ++ ".scan",
-    file:delete(ScannerCacheFileName),
-    RefsFileName = BaseName ++ ".refs",
-    file:delete(RefsFileName),
-    CacheFileName = BaseName ++ ".noparse",
-    file:delete(CacheFileName).
 
 %%
 %% Internal functions
@@ -118,17 +103,12 @@ get_tokens(ScannerName, ModuleFileName, InitialText, StateDir) ->
             erlide_scanner:get_tokens(ScannerName)
     end.
 
-do_parse(ScannerName, RefsFileName, Tokens, StateDir, UpdateSearchServer) ->
+do_parse(ScannerName, Tokens, StateDir, UpdateSearchServer) ->
     {Forms, Comments, References} = erlide_np:parse(Tokens),
     ?D(Forms),
     Model = #model{forms=Forms, comments=Comments},
     CompactModel = erlide_np_util:compact_model(Model),
     ?D(CompactModel),
-    case StateDir of
-        "" -> ok;
-        _ ->
-            file:write_file(RefsFileName, term_to_binary(References, [compressed]))
-    end,
     update_search_server(UpdateSearchServer, ScannerName, References),
     {CompactModel, References}.
 

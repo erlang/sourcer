@@ -175,4 +175,4 @@ test_replace_and_reparse(S, Offset, RemoveLength, NewText) ->
     Model.
 
 %% t() ->
-%%     sourcer_noparse:initial_parse(testing, ModuleFileName, StateDir, UpdateCaches, UpdateSearchServer),
+%%     sourcer_noparse:initial_parse(testing, ModuleFileName, StateDir, UpdateSearchServer),

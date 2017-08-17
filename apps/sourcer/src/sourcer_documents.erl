@@ -44,7 +44,7 @@ parse_file(File, Text) ->
 	case sourcer_noparse:initial_parse(list_to_atom(unicode:characters_to_list(File)), 
 			unicode:characters_to_list(File), 
 			TText,
-			".", false, false) of
+			".", false) of
 		{ok, {model, AST, _}, Refs} ->
 			io:format("00* ~p~n", [Refs]),
 			{Lines, _} = get_line_info(TText),
