@@ -19,8 +19,6 @@
 
 -include("dbglog.hrl").
 
--define(CACHE_VERSION, 2).
-
 %% recursively return tags for which Fun returns true
 %%
 %% recu_find_tags(L, Fun) ->

@@ -47,7 +47,7 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir,
     end.
 
 -spec reparse(atom(), boolean()) ->
-          {ok, #model{}, cached | renewing | dont_use_cache, [#ref{}]}
+          {ok, #model{}}
               | {error, term(), term()}.
 reparse(ScannerName, UpdateSearchServer) ->
     try

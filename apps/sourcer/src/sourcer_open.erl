@@ -29,8 +29,6 @@
 -include("sourcer_open.hrl").
 -include("include/sourcer_token.hrl").
 
--define(CACHE_VERSION, 4).
-
 %%
 %% API Functions
 %%

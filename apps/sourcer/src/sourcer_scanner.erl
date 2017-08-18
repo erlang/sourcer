@@ -19,8 +19,6 @@
 %% API Functions
 %%
 
--define(CACHE_VERSION, 25).
-
 light_scan_string(B, latin1) ->
     S = unicode:characters_to_list(B),
     do_light_scan(S);
