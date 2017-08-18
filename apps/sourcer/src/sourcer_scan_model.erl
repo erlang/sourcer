@@ -5,19 +5,11 @@
 
 -module(sourcer_scan_model).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 -include("sourcer_token.hrl").
 -include("sourcer_scanner_server.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -export([do_scan/2, tokens_to_string/1, get_all_tokens/1, replace_text/4,
          get_token_window/4, get_token_at/2, get_text/1]).

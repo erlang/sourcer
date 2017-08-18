@@ -4,19 +4,11 @@
 
 -module(sourcer_noparse).
 
-%%
-%% Exported Functions
-%%
-
 %% called from Java
 -export([initial_parse/5, reparse/2]).
 
 %% called from Erlang
 -export([get_module_refs/4]).
-
-%%
-%% Include files
-%%
 
 -define(DEBUG, 1).
 -define(IO_FORMAT_DEBUG, 1).

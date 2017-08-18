@@ -3,16 +3,8 @@
 %% Created: 7 may 2013
 -module(sourcer_open_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("sourcer_open.hrl").
-
-%%
-%% test Functions
-%%
 
 internal_split_test_() ->
     [

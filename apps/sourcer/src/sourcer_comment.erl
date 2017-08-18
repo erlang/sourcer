@@ -3,13 +3,6 @@
 
 -module(sourcer_comment).
 
-%%
-%% Include files
-%%
-
-%%
-%% Exported Functions
-%%
 -export([toggle_comment/3]).
 
 %-define(DEBUG, 1). %

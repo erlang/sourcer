@@ -3,19 +3,11 @@
 %% Description:
 -module(sourcer_scanner).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 -include("sourcer_token.hrl").
 -include("sourcer_scanner_server.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -export([light_scan_string/2, scan_string/1, initial_scan_0/4, initial_scan/4,
          get_token_at/2,

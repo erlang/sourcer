@@ -3,18 +3,10 @@
 %% Description:
 -module(sourcer_scanner_server).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 -include("sourcer_scanner_server.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -export([server_cmd/2, server_cmd/3,
          spawn_server/1]).

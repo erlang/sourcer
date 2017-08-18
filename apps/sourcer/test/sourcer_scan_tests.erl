@@ -1,18 +1,10 @@
 %% coding: utf-8
 -module(sourcer_scan_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_token.hrl").
 
 -define(D(X), begin Y=X, io:format("~p~n", [Y]), Y end).
-
-%%
-%% Exported Functions
-%%
 
 tokens_test_() ->
     [?_assertEqual({ok, [#token{kind = atom, line = 0, offset = 0, length = 1, value = a, text="a"}],

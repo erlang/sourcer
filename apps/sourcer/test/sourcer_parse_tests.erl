@@ -1,9 +1,5 @@
 -module(sourcer_parse_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 
 split_test_() ->

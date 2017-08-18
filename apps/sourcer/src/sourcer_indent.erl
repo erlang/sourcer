@@ -3,14 +3,6 @@
 %% Description:
 -module(sourcer_indent).
 
-%%
-%% Include files
-%%
-
-%%
-%% Exported Functions
-%%
-
 -export([
          indent_line/7,
          indent_lines/7,

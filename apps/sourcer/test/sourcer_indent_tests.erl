@@ -2,15 +2,7 @@
 %% Created: 24 nov 2009
 -module(sourcer_indent_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
-
-%%
-%% test Functions
-%%
 
 -define(Test_indent(SIndent, S),
         ?_assertEqual(SIndent,

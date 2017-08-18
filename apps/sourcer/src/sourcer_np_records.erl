@@ -2,16 +2,9 @@
 %% Created: 18 dec 2010
 -module(sourcer_np_records).
 
-%%
-%% Include files
-%%
-
 -include("sourcer_token.hrl").
 -include("sourcer_search.hrl").
 
-%%
-%% Exported Functions
-%%
 -export([check_fields/2]).
 
 %%

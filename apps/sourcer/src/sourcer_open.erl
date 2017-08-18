@@ -22,10 +22,6 @@
 
 %% TODO: (JC) there are some code duplication in external modules (and includes) handling
 
-%%
-%% Include files
-%%
-
 %%-define(DEBUG, 1).
 %%-define(IO_FORMAT_DEBUG, 1).
 

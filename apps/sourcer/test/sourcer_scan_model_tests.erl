@@ -2,16 +2,8 @@
 
 -module(sourcer_scan_model_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_token.hrl").
-
-%%
-%% Exported Functions
-%%
 
 %%
 %% API Functions

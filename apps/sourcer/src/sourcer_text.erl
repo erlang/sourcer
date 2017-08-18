@@ -4,13 +4,6 @@
 
 -module(sourcer_text).
 
-%%
-%% Include files
-%%
-
-%%
-%% Exported Functions
-%%
 -export([get_text_and_lines/3,
          split_lines/1,
          check_function_call/2,

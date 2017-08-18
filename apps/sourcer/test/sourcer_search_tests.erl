@@ -2,10 +2,6 @@
 %% Created: 20 dec 2010
 -module(sourcer_search_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 
 %%

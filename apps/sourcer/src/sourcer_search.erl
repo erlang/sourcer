@@ -3,19 +3,10 @@
 
 -module(sourcer_search).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
-
 -include("include/sourcer_search.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -export([find_data/4]).
 

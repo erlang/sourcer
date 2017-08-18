@@ -4,20 +4,11 @@
 
 -module(sourcer_search_server).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 
 -include_lib("kernel/include/file.hrl").
-
-%%
-%% Exported Functions
-%%
-
 
 %% called from Java
 -export([start/0,

@@ -6,19 +6,12 @@
 
 -author(jakob).
 
-%%
-%% Include files
-%%
-
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 -include("include/sourcer_token.hrl").
 
 
-%%
-%% Exported Functions
-%%
 -export([get_variables/2, check_record/1, get_function_head/2, check_record_tokens/1]).
 
 %%

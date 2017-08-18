@@ -2,17 +2,9 @@
 %% Created: 30 aug 2010
 -module(sourcer_parsing_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_noparse.hrl").
 -include("sourcer_token.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -export([test_parse/1]).
 

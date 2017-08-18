@@ -2,16 +2,8 @@
 %% Created: 12 okt 2009
 -module(sourcer_scanner_tests).
 
-%%
-%% Include files
-%%
-
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_token.hrl").
-
-%%
-%% Exported Functions
-%%
 
 -define(D(X), begin Y=X, io:format("~p~n", [Y]), Y end).
 
