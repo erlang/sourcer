@@ -1,4 +1,3 @@
-%% coding: utf-8
 -module(test_unicode).
 %%
 %% 人不知而不慍，不亦君子乎？」

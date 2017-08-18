@@ -1,4 +1,3 @@
-%% coding: utf-8
 -module(sourcer_scan_tests).
 
 -include_lib("eunit/include/eunit.hrl").
