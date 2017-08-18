@@ -6,18 +6,20 @@
 
 - a generic language server implementation `lsp_server`
 - Erlang support for the above `erlang_ls`
-- tooling for extracting information about code in a simple format `sourcer`
+- Erlang language services library `sourcer`
 
-## Generic language server
+## Generic language server `lsp_server`
 
-The language server uses a TCP connection to talk LSP with clients. It delegates the actual work to a language specific server. It includes an implementation of an cancelable worker process.
+The generic language server uses a TCP connection to talk LSP with clients. It encodes/decodes the messages and delegates the actual work to a language specific server, using cancelable worker processes. It also supports making requests to the client.
 
-## Erlang server
+## Erlang server `erlang_ls`
 
-This is an adapter from LSP to the 'sourcer' data (see below) and back.
+This is the "real" server, connecting the generic and specific parts and an adapter from LSP to the 'sourcer' data format (see below) and back.
 
-## Sourcer
+## Language services library `sourcer`
 
 The actual work is done by this application. It is meant to be LSP-agnostic so that it can be used in other contexts and tools.
 
 An own parser (largely based on the legacy 'sourcer' code, but simpler) processes the source code and produces a ctags-like database containing information about all interesting code entities. The database should be distributed, in the sense that libraries should be able to provide the data about their own code (produced at build time).
+
+Query facilities are provided so that the information in the database is presented in a way that the LSP expects.
