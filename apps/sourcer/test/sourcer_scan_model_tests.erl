@@ -1,13 +1,13 @@
 %% @author jakob
 
--module(erlide_scan_model_tests).
+-module(sourcer_scan_model_tests).
 
 %%
 %% Include files
 %%
 
 -include_lib("eunit/include/eunit.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 %%
 %% Exported Functions
@@ -52,8 +52,8 @@ replace_at_eol_test_() ->
 %%
 
 test_replace(S, Pos, RemoveLength, NewText) ->
-    M = erlide_scan_model:do_scan(testing, S),
-    NewM = erlide_scan_model:replace_text(M, Pos, RemoveLength, NewText),
-    R1 = erlide_scan_model:get_all_tokens(M),
-    R2 = erlide_scan_model:get_all_tokens(NewM),
+    M = sourcer_scan_model:do_scan(testing, S),
+    NewM = sourcer_scan_model:replace_text(M, Pos, RemoveLength, NewText),
+    R1 = sourcer_scan_model:get_all_tokens(M),
+    R2 = sourcer_scan_model:get_all_tokens(NewM),
     {R1, R2}.

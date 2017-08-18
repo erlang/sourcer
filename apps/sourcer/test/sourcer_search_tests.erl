@@ -1,6 +1,6 @@
 %% Author: jakob
 %% Created: 20 dec 2010
--module(erlide_search_tests).
+-module(sourcer_search_tests).
 
 %%
 %% Include files
@@ -55,7 +55,7 @@ external_call_after_empty_record_test_() ->
      ?_assertEqual(Expected2, Value2)].
 
 find_second_field_in_record_match_test_() ->
-    %% http://www.assembla.com/spaces/erlide/tickets/1268-searching---can-t-find-fields-in-record-match---construction
+    %% http://www.assembla.com/spaces/sourcer/tickets/1268-searching---can-t-find-fields-in-record-match---construction
     S = "x(A, B) ->\n    #r{field1=A, field2=B}.",
     Value = test_refs(S, {record_field_ref, r, field2}),
     Expected = [{"xxx",x,2,"(A, B)",false,28,6,false}],
@@ -67,6 +67,6 @@ find_second_field_in_record_match_test_() ->
 %%
 
 test_refs(S, SearchPattern) ->
-    {ok, Tokens, _EndPos} = erlide_scan:string(S),
-    {_Forms, _Comments, Refs} = erlide_np:parse(Tokens),
-    erlide_search:find_data(Refs, [SearchPattern], xxx, "xxx").
+    {ok, Tokens, _EndPos} = sourcer_scan:string(S),
+    {_Forms, _Comments, Refs} = sourcer_np:parse(Tokens),
+    sourcer_search:find_data(Refs, [SearchPattern], xxx, "xxx").

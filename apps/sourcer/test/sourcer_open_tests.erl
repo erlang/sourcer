@@ -1,14 +1,14 @@
 %% coding: latin-1
 %% Author: jakob
 %% Created: 7 may 2013
--module(erlide_open_tests).
+-module(sourcer_open_tests).
 
 %%
 %% Include files
 %%
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("erlide_open.hrl").
+-include_lib("sourcer_open.hrl").
 
 %%
 %% test Functions
@@ -65,10 +65,10 @@ open_record_field_test_() ->
 
 open_test(S) ->
     {S1, Offset} = split(S),
-    erlide_scanner:create(test),
-    erlide_scanner:initial_scan(test, "", S1, ""),
-    R = erlide_open:open(test, Offset, #open_context{imports=[]}),
-    erlide_scanner:dispose(test),
+    sourcer_scanner:create(test),
+    sourcer_scanner:initial_scan(test, "", S1, ""),
+    R = sourcer_open:open(test, Offset, #open_context{imports=[]}),
+    sourcer_scanner:dispose(test),
     R.
 
 split(S) ->

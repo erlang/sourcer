@@ -1,7 +1,7 @@
 %% otp_doc - extract documentation from otp HTML
 %%
 
--module(erlide_otp_doc).
+-module(sourcer_otp_doc).
 
 -export([get_doc/3,
          get_doc_from_fun_arity_list/3,
@@ -441,7 +441,7 @@ get_doc_for_external(StateDir, Mod, FuncList) ->
         OutDir = get_doc_dir(Module),
         ?D(OutDir),
         DocFileName = filename:join(OutDir, Module ++ ".html"),
-        IndexFileName = filename:join([StateDir, "erlide_doc",
+        IndexFileName = filename:join([StateDir, "sourcer_doc",
                                        Module ++ ".doc"]),
         filelib:ensure_dir(IndexFileName),
         Renew = fun(F) -> extract_from_file(F) end,

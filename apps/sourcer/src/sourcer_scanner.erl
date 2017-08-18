@@ -1,7 +1,7 @@
 %% Author: jakob
 %% Created: 24 apr 2008
 %% Description:
--module(erlide_scanner).
+-module(sourcer_scanner).
 
 %%
 %% Include files
@@ -10,8 +10,8 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("erlide_token.hrl").
--include("erlide_scanner_server.hrl").
+-include("sourcer_token.hrl").
+-include("sourcer_scanner_server.hrl").
 
 %%
 %% Exported Functions
@@ -39,54 +39,54 @@ light_scan_string(B, utf8) ->
 scan_string(B) when is_binary(B) ->
     scan_string(binary_to_list(B));
 scan_string(L) when is_list(L) ->
-    M = erlide_scan_model:do_scan('', L),
-    erlide_scan_model:get_all_tokens(M).
+    M = sourcer_scan_model:do_scan('', L),
+    sourcer_scan_model:get_all_tokens(M).
 
 initial_scan_0(ScannerName, ModuleFileName, Text, _StateDir) ->
-    RenewFun = fun(_F) -> erlide_scan_model:do_scan(ScannerName, Text) end,
+    RenewFun = fun(_F) -> sourcer_scan_model:do_scan(ScannerName, Text) end,
     RenewFun(ModuleFileName).
 
 get_token_at(ScannerName, Offset) when is_atom(ScannerName), is_integer(Offset) ->
-    erlide_scanner_server:server_cmd(ScannerName, get_token_at, Offset).
+    sourcer_scanner_server:server_cmd(ScannerName, get_token_at, Offset).
 
 initial_scan(ScannerName, ModuleFileName, InitialText, StateDir)
   when is_atom(ScannerName), is_list(ModuleFileName), is_list(InitialText), is_list(StateDir) ->
-    erlide_scanner_server:server_cmd(ScannerName, initial_scan,
+    sourcer_scanner_server:server_cmd(ScannerName, initial_scan,
                                      {ScannerName, ModuleFileName, InitialText, StateDir}).
 
 create(ScannerName) when is_atom(ScannerName) ->
-    erlide_scanner_server:spawn_server(ScannerName).
+    sourcer_scanner_server:spawn_server(ScannerName).
 
 addref(ScannerName) when is_atom(ScannerName) ->
-    erlide_scanner_server:server_cmd(ScannerName, addref).
+    sourcer_scanner_server:server_cmd(ScannerName, addref).
 
 dispose(ScannerName) when is_atom(ScannerName) ->
-    erlide_search_server:remove_module(ScannerName),
-    erlide_scanner_server:server_cmd(ScannerName, dispose).
+    sourcer_search_server:remove_module(ScannerName),
+    sourcer_scanner_server:server_cmd(ScannerName, dispose).
 
 get_text(ScannerName) when is_atom(ScannerName) ->
-    erlide_scanner_server:server_cmd(ScannerName, get_text).
+    sourcer_scanner_server:server_cmd(ScannerName, get_text).
 
 get_tokens(ScannerName) when is_atom(ScannerName) ->
-    erlide_scanner_server:server_cmd(ScannerName, get_tokens).
+    sourcer_scanner_server:server_cmd(ScannerName, get_tokens).
 
 get_token_window(ScannerName, Offset, Before, After)
   when is_atom(ScannerName), is_integer(Offset), is_integer(Before), is_integer(After) ->
-    erlide_scanner_server:server_cmd(ScannerName, get_token_window, {Offset, Before, After}).
+    sourcer_scanner_server:server_cmd(ScannerName, get_token_window, {Offset, Before, After}).
 
 dump_module(ScannerName) when is_atom(ScannerName) ->
-    erlide_scanner_server:server_cmd(ScannerName, dump_module).
+    sourcer_scanner_server:server_cmd(ScannerName, dump_module).
 
 replace_text(ScannerName, Offset, RemoveLength, NewText)
   when is_atom(ScannerName), is_integer(Offset), is_integer(RemoveLength), is_list(NewText) ->
-    erlide_scanner_server:server_cmd(ScannerName, replace_text, {Offset, RemoveLength, NewText}).
+    sourcer_scanner_server:server_cmd(ScannerName, replace_text, {Offset, RemoveLength, NewText}).
 
 %%
 %% Local Functions
 %%
 
 do_light_scan(S) ->
-    case erlide_scan:string(S, {0, 1}, [return]) of
+    case sourcer_scan:string(S, {0, 1}, [return]) of
         {ok, T, _} ->
             {ok, convert_tokens(T)};
         {error, _, _} ->
@@ -119,7 +119,7 @@ kind_small(char) -> ?TOK_CHAR;
 kind_small('->') -> ?TOK_ARROW;
 kind_small(comment) -> ?TOK_COMMENT;
 kind_small(Kind) when is_atom(Kind) ->
-    case erlide_scan:reserved_word(Kind) of
+    case sourcer_scan:reserved_word(Kind) of
         true ->
             ?TOK_KEYWORD;
         false ->

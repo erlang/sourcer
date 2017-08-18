@@ -1,7 +1,7 @@
 %% Author: jakob
 %% Created: 2006-jan-28
 %% Description:
--module(erlide_indent).
+-module(sourcer_indent).
 
 %%
 %% Include files
@@ -21,7 +21,7 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("include/erlide_token.hrl").
+-include("include/sourcer_token.hrl").
 
 %% TODO: change into multiples of IndentW
 default_indent_prefs() ->
@@ -50,14 +50,14 @@ indent_line(St, OldLine, CommandText, IndentW, Tablength, UseTabs, Prefs) ->
 
 indent_line(St, OldLine, CommandText, N, _IndentW, Tablength, UseTabs, Prefs) ->
     ?D(St),
-    S = erlide_text:detab(St, Tablength, all),
-    StrippedCommandText = erlide_text:left_strip(CommandText),
+    S = sourcer_text:detab(St, Tablength, all),
+    StrippedCommandText = sourcer_text:left_strip(CommandText),
     {Indent, AddNL} = check_add_newline(StrippedCommandText, Prefs),
     case Indent of
         true ->
             case scan(S ++ StrippedCommandText) of
                 {ok, T} ->
-                    LineOffsets = erlide_text:get_line_offsets(S),
+                    LineOffsets = sourcer_text:get_line_offsets(S),
                     Tr = T ++
                              [#token{kind=eof, line=size(LineOffsets)+1}],
                     LineN = case N of
@@ -67,12 +67,12 @@ indent_line(St, OldLine, CommandText, N, _IndentW, Tablength, UseTabs, Prefs) ->
                                     N
                             end,
                     ?D({indent_line, OldLine}),
-                    case indent(Tr, LineOffsets, LineN, Prefs, erlide_text:left_strip(OldLine)) of
+                    case indent(Tr, LineOffsets, LineN, Prefs, sourcer_text:left_strip(OldLine)) of
                         {I, true} ->
                             ?D(I),
                             IS0 = reindent_line("", I),
                             IS = entab(IS0, UseTabs, Tablength),
-                            {IS, erlide_text:initial_whitespace(OldLine), AddNL};
+                            {IS, sourcer_text:initial_whitespace(OldLine), AddNL};
                         {I, false} ->
                             ?D(I),
                             case AddNL of
@@ -93,7 +93,7 @@ indent_line(St, OldLine, CommandText, N, _IndentW, Tablength, UseTabs, Prefs) ->
 entab(S, false, _Tablength) ->
     S;
 entab(S, true, Tablength) ->
-    erlide_text:entab(S, Tablength, left).
+    sourcer_text:entab(S, Tablength, left).
 
 get_key(",") -> comma_nl;
 get_key(',') -> comma_nl;
@@ -159,7 +159,7 @@ get_indent_of(_A = #token{line=N, offset=O}, C, LineOffsets) ->
     TI+C.
 
 indent_lines(S, From, Length, IndentW, Tablength, UseTabs, Prefs) ->
-    {First, FirstLineNum, Lines} = erlide_text:get_text_and_lines(S, From, Length),
+    {First, FirstLineNum, Lines} = sourcer_text:get_text_and_lines(S, From, Length),
     do_indent_lines(Lines, IndentW, Tablength, UseTabs, First, get_prefs(Prefs), FirstLineNum, "").
 
 template_indent_lines(Prefix, S, IndentW, Tablength, UseTabs, Prefs) ->
@@ -167,7 +167,7 @@ template_indent_lines(Prefix, S, IndentW, Tablength, UseTabs, Prefs) ->
     S1 = quote_template_variables(S0),
     From = length(Prefix),
     Length = length(S1) - From,
-    {First, FirstLineNum, Lines} = erlide_text:get_text_and_lines(S1, From, Length),
+    {First, FirstLineNum, Lines} = sourcer_text:get_text_and_lines(S1, From, Length),
     S2 = do_indent_lines(Lines, IndentW, Tablength, UseTabs, First, get_prefs(Prefs), FirstLineNum, ""),
     S3 = string:substr(S2, length(Prefix)+1, length(S2)-1),
     unquote_template_variables(S3).
@@ -544,7 +544,7 @@ i_macro_rest(R0, I) ->
                K=:='end'; K=:='->'; K =:= '||' ->
             R0;
         K ->
-            case erlide_scan:reserved_word(K) of
+            case sourcer_scan:reserved_word(K) of
                 true ->
                     R0;
                 _ ->
@@ -628,14 +628,14 @@ i_try(R0, I0) ->
 is_binary_op([T | _]) ->
     is_binary_op(T);
 is_binary_op(#token{kind=Kind}) ->
-    erlide_text:is_op2(Kind);
+    sourcer_text:is_op2(Kind);
 is_binary_op(Kind) ->
-    erlide_text:is_op2(Kind).
+    sourcer_text:is_op2(Kind).
 
 is_unary_op([T | _]) ->
     is_unary_op(T);
 is_unary_op(#token{kind=Kind}) ->
-    erlide_text:is_op1(Kind).
+    sourcer_text:is_op1(Kind).
 
 i_block_end(_Begin, R0, R1, I0) ->
     I1 = i_with(end_paren, R0, I0),
@@ -969,7 +969,7 @@ i_sniff(L) ->
     end.
 
 scan(S) ->
-    case erlide_scan:string(S, {0, 1}, [return_comments]) of
+    case sourcer_scan:string(S, {0, 1}, [return_comments]) of
         {ok, T, _} ->
             {ok, T};
         Error ->

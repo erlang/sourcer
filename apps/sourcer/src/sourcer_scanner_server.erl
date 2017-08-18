@@ -1,7 +1,7 @@
 %% Author: jakob
 %% Created: 24 apr 2008
 %% Description:
--module(erlide_scanner_server).
+-module(sourcer_scanner_server).
 
 %%
 %% Include files
@@ -10,7 +10,7 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("erlide_scanner_server.hrl").
+-include("sourcer_scanner_server.hrl").
 
 %%
 %% Exported Functions
@@ -80,7 +80,7 @@ loop(Module, Refs) ->
             NewModule = cmd(Cmd, From, Args, Module),
             ?MODULE:loop(NewModule, Refs);
         Msg ->
-            %erlide_log:log({scanner, Module#module.name, unexpected_message, Msg}),
+            %sourcer_log:log({scanner, Module#module.name, unexpected_message, Msg}),
             ?MODULE:loop(Module, Refs)
     end.
 
@@ -108,18 +108,18 @@ reply(Cmd, From, R) ->
 
 do_cmd(initial_scan, {ScannerName, ModuleFileName, InitialText, StateDir}, _Module) ->
     ?D({initial_scan, ScannerName, length(InitialText)}),
-    Module1 = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir),
+    Module1 = sourcer_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir),
     {ok, Module1};
 do_cmd(dump_module, [], Module) ->
     {Module, Module};
 do_cmd(get_token_at, Offset, Module) ->
-    {erlide_scan_model:get_token_at(Module, Offset), Module};
+    {sourcer_scan_model:get_token_at(Module, Offset), Module};
 do_cmd(replace_text, {Offset, RemoveLength, NewText}, Module) ->
     ?D({replace_text, Offset, RemoveLength, length(NewText)}),
-    erlide_scan_model:replace_text(Module, Offset, RemoveLength, NewText);
+    sourcer_scan_model:replace_text(Module, Offset, RemoveLength, NewText);
 do_cmd(get_text, [], Module) ->
-    {erlide_scan_model:get_text(Module), Module};
+    {sourcer_scan_model:get_text(Module), Module};
 do_cmd(get_tokens, [], Module) ->
-    {erlide_scan_model:get_all_tokens(Module), Module};
+    {sourcer_scan_model:get_all_tokens(Module), Module};
 do_cmd(get_token_window, {Offset, Before, After}, Module) ->
-    {erlide_scan_model:get_token_window(Module, Offset, Before, After), Module}.
+    {sourcer_scan_model:get_token_window(Module, Offset, Before, After), Module}.

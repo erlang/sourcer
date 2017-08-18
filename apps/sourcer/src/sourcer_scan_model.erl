@@ -3,7 +3,7 @@
 %% and the unit test
 
 
--module(erlide_scan_model).
+-module(sourcer_scan_model).
 
 %%
 %% Include files
@@ -12,8 +12,8 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("erlide_token.hrl").
--include("erlide_scanner_server.hrl").
+-include("sourcer_token.hrl").
+-include("sourcer_scanner_server.hrl").
 
 %%
 %% Exported Functions
@@ -29,7 +29,7 @@
 do_scan(ScannerName, InitialText) ->
     ?D(do_scan),
     %% TODO: FIXME splitting by line messes up multiline strings
-    Lines = erlide_scan_util:split_lines_w_lengths(InitialText),
+    Lines = sourcer_scan_util:split_lines_w_lengths(InitialText),
     LineTokens = [scan_line(L) || L <- Lines],
     ?D([ScannerName]), % , InitialText, LineTokens]),
     #module{name=ScannerName, lines=Lines, tokens=LineTokens}.
@@ -60,7 +60,7 @@ get_token_window(Module, Offset, Before, After) ->
     {A, B}.
 
 get_token_at(Module, Offset) ->
-    case erlide_scan_util:find_line_w_offset(Offset, Module#module.tokens) of
+    case sourcer_scan_util:find_line_w_offset(Offset, Module#module.tokens) of
         {N, Pos, _Length, Tokens, false} ->
             case get_token_at_aux(Tokens, Offset - Pos) of
                 token_not_found ->
@@ -115,9 +115,9 @@ substr(Text, Start, Length) ->
     string:substr(Text, Start, Length).
 
 replace_between_lines(From, Length, With, Lines) ->
-    case erlide_scan_util:find_line_w_offset(From, Lines) of
+    case sourcer_scan_util:find_line_w_offset(From, Lines) of
         not_found ->
-            %erlide_log:log({not_found, "erlide_scan_util:find_line_w_offset", From, Lines}),
+            %sourcer_log:log({not_found, "sourcer_scan_util:find_line_w_offset", From, Lines}),
             ok;
         {LineNo1, Pos1, _Length1, Line1, Beyond1} ->
             ?D({LineNo1, Pos1, _Length1, Line1, Beyond1}),
@@ -126,7 +126,7 @@ replace_between_lines(From, Length, With, Lines) ->
                            0 ->
                                {LineNo1, Pos1, unused, Line1, Beyond1};
                            _ ->
-                               erlide_scan_util:find_line_w_offset(From+Length, Lines)
+                               sourcer_scan_util:find_line_w_offset(From+Length, Lines)
                        end,
             case LineInfo of
                 {LineNo2, Pos2, _Length2, Line2, Beyond2} ->
@@ -144,12 +144,12 @@ replace_between_lines(From, Length, With, Lines) ->
                             _ ->
                                 {FirstPiece++With++LastPiece, LineNo2-LineNo1+1}
                         end,
-                    WLines = erlide_scan_util:split_lines_w_lengths(NewText),
+                    WLines = sourcer_scan_util:split_lines_w_lengths(NewText),
                     ?D(WLines),
                     {LineNo1, NOldLines, WLines,
                      replace_between(LineNo1, NOldLines, WLines, Lines)};
                 _ ->
-                    %erlide_log:log({not_found_2, "erlide_scan_util:find_line_w_offset", From+Length, Lines}),
+                    %sourcer_log:log({not_found_2, "sourcer_scan_util:find_line_w_offset", From+Length, Lines}),
                     ok
             end
     end.
@@ -202,7 +202,7 @@ get_tokens_at(Module, Offset, N) ->
 get_tokens_at(_Module, _Offset, 0, Acc) ->
     lists:reverse(Acc);
 get_tokens_at(Module, Offset, N, Acc0) ->
-    case erlide_scan_util:find_line_w_offset(Offset, Module#module.tokens) of
+    case sourcer_scan_util:find_line_w_offset(Offset, Module#module.tokens) of
         {LineNo, Pos, Length, Tokens, false} ->
             {M, Ts} = get_tokens_at_aux(Tokens, Offset - Pos, N),
             Acc1 =
@@ -276,7 +276,7 @@ get_all_tokens([{Length, Tokens} | Rest], Line, Pos, Acc) ->
     get_all_tokens(Rest, Line+1, Pos+Length, [Acc, T]).
 
 scan_line({Length, S}) ->
-    case erlide_scan:string(S, {0, 1}, [return_comments]) of
+    case sourcer_scan:string(S, {0, 1}, [return_comments]) of
         {ok, T, _} ->
             {Length, T};
         {error, _, _} ->

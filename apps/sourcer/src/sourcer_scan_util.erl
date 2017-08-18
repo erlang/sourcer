@@ -1,10 +1,10 @@
 %% @author jakob
-%% @doc @todo Add description to erlide_scan_util.
+%% @doc @todo Add description to sourcer_scan_util.
 
 
--module(erlide_scan_util).
+-module(sourcer_scan_util).
 
--export([split_lines_w_lengths/1, find_line_w_offset/2]).
+-export([split_lines_w_lengths/1, find_line_w_offset/2, get_lines_info/1]).
 
 %% [{Length, TextIncNL}...]
 split_lines_w_lengths(Text) ->
@@ -25,6 +25,10 @@ split_lines_w_lengths("\r" ++ Text, Length, LineAcc, Acc) ->
                           [{Length+1, lists:reverse(LineAcc, "\r")} | Acc]);
 split_lines_w_lengths([C | Text], Length, LineAcc, Acc) ->
     split_lines_w_lengths(Text, Length+1, [C | LineAcc], Acc).
+
+get_lines_info(Binary) when is_binary(Binary) ->
+    Lines = binary:split(Binary, [<<"\r">>, <<"\n">>, <<"\r\n">>], [global]).
+
 
 %% Find a line from [{Length, Line
 
@@ -53,3 +57,19 @@ ends_with_newline("\r") -> true;
 ends_with_newline("\r\n") -> true;
 ends_with_newline([_C | R]) ->
     ends_with_newline(R).
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+lines_info_test_() ->
+    [
+        ?_assertEqual([<<"">>], get_lines_info(<<"">>)),
+        ?_assertEqual([<<"abc">>], get_lines_info(<<"abc">>)),
+        ?_assertEqual([<<"a">>,<<"b">>], get_lines_info(<<"a\nb">>)),
+        ?_assertEqual([<<"a">>,<<"b">>,<<"c">>,<<"d">>], get_lines_info(<<"a\nb\rc\r\nd">>)),
+        ?_assertEqual([<<"a">>,<<"">>,<<"b">>], get_lines_info(<<"a\n\rb">>)),
+        ?_assertEqual([<<"a">>,<<"b">>], get_lines_info(<<"a\nb">>))
+    ].
+
+-endif.

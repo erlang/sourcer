@@ -1,6 +1,6 @@
 %% Author: jakob
 %% Created: 24 nov 2009
--module(erlide_indent_tests).
+-module(sourcer_indent_tests).
 
 %%
 %% Include files
@@ -14,7 +14,7 @@
 
 -define(Test_indent(SIndent, S),
         ?_assertEqual(SIndent,
-                      erlide_indent:indent_lines(S, 0, length(S), 8, 8, false, []))).
+                      sourcer_indent:indent_lines(S, 0, length(S), 8, 8, false, []))).
 
 simple_function_test_() ->
     S = "a() ->\nb.\n",
@@ -25,7 +25,7 @@ simple_function1_test_() ->
     S = "a() ->\nb.\n",
     SIndent = "a() ->\n    b.\n",
     ?_assertEqual(SIndent,
-                  erlide_indent:indent_lines(S, 0, length(S), 8, 8, false, [])).
+                  sourcer_indent:indent_lines(S, 0, length(S), 8, 8, false, [])).
 
 expressions_test_() ->
     S = "#r{a=a,\nb=b, [a,\nb],\n{a, b,\nc, fn(a, \nb)}},",
@@ -82,7 +82,7 @@ binary_1_test_() ->
             "      2>>.",
     ?Test_indent(SIndent, S).
 
-%% http://www.assembla.com/spaces/erlide/tickets/595-indentation---doesn-t-handle-binaries-with-macros-or-expressions
+%% http://www.assembla.com/spaces/sourcer/tickets/595-indentation---doesn-t-handle-binaries-with-macros-or-expressions
 binary_2_test_() ->
     S =
         ""++
@@ -142,7 +142,7 @@ export_test_() ->
 
 
 %% binary comprehensions
-%% http://www.assembla.com/spaces/erlide/tickets/729-indent--can-t-handle-binary-compehensions
+%% http://www.assembla.com/spaces/sourcer/tickets/729-indent--can-t-handle-binary-compehensions
 binary_3_test_() ->
     S = ""++
             "foo(BS) ->\n"++
@@ -155,7 +155,7 @@ binary_3_test_() ->
     ?Test_indent(SIndent, S).
 
 %%
-%% http://www.assembla.com/spaces/erlide/tickets/787-indent---confused-by-macros-in-case-clauses
+%% http://www.assembla.com/spaces/sourcer/tickets/787-indent---confused-by-macros-in-case-clauses
 macros_in_predicates_test_() ->
     S = ""++
             "foo() ->\n"++
@@ -182,7 +182,7 @@ type_test_() ->
     ?Test_indent(SIndent, S).
 
 
-%% https://www.assembla.com/spaces/erlide/tickets/936-indent--macros-in-list-comprehensions
+%% https://www.assembla.com/spaces/sourcer/tickets/936-indent--macros-in-list-comprehensions
 macro_in_lc_test_() ->
     S = "" ++
             "b() ->\n"++
@@ -224,7 +224,7 @@ adjacent_string_test_() ->
               "       ok.",
     ?Test_indent(SIndent, S).
 
-%% http://www.assembla.com/spaces/erlide/tickets/776
+%% http://www.assembla.com/spaces/sourcer/tickets/776
 %% indentation: receive..after is wrong
 indent_after_test_() ->
     S = "" ++
@@ -262,7 +262,7 @@ indent_after1_test_() ->
             "    end.\n",
     ?Test_indent(I, S).
 
-%% http://www.assembla.com/spaces/erlide/tickets/1083-indentation--bad-after--spec-with-when-clause
+%% http://www.assembla.com/spaces/sourcer/tickets/1083-indentation--bad-after--spec-with-when-clause
 indent_spec_with_when_test_() ->
     S = "" ++
             "-spec a(T) -> ok when T::term().\n"++
@@ -274,7 +274,7 @@ indent_spec_with_when_test_() ->
             "    ok.\n",
     ?Test_indent(I, S).
 
-%% http://assembla.com/spaces/erlide/tickets/1151-indent--fails-for-catch-with-guards
+%% http://assembla.com/spaces/sourcer/tickets/1151-indent--fails-for-catch-with-guards
 indent_catch_with_guards_test_() ->
     S = "" ++
             "f() ->\n"++
@@ -482,4 +482,4 @@ indent_map_arg_test_() ->
 %%
 
 %% test_indent(SIndent, S) ->
-%%     ?_assertEqual(SIndent, erlide_indent:indent_lines(S, 0, length(S), 8, 8, false, [])).
+%%     ?_assertEqual(SIndent, sourcer_indent:indent_lines(S, 0, length(S), 8, 8, false, [])).

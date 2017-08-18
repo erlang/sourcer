@@ -1,13 +1,13 @@
 %% Author: jakob
 %% Created: 18 dec 2010
--module(erlide_np_records).
+-module(sourcer_np_records).
 
 %%
 %% Include files
 %%
 
--include("erlide_token.hrl").
--include("erlide_search.hrl").
+-include("sourcer_token.hrl").
+-include("sourcer_search.hrl").
 
 %%
 %% Exported Functions

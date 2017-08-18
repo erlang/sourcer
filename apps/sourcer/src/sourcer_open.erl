@@ -1,7 +1,7 @@
 %% Author: jakob
 %% Created: Mar 23, 2006
 %% Description:
--module(erlide_open).
+-module(sourcer_open).
 -author('jakobce@gmail.com').
 
 %%
@@ -30,8 +30,8 @@
 %%-define(IO_FORMAT_DEBUG, 1).
 
 -include("dbglog.hrl").
--include("erlide_open.hrl").
--include("include/erlide_token.hrl").
+-include("sourcer_open.hrl").
+-include("include/sourcer_token.hrl").
 
 -define(CACHE_VERSION, 4).
 
@@ -44,7 +44,7 @@ open(Mod, Offset, #open_context{imports=Imports0}=Context) ->
     Imports = sourcer_util:add_auto_imported(Imports0),
     try
         {TokensWComments, BeforeReversed} =
-            erlide_scanner:get_token_window(Mod, Offset, 45, 100),
+            sourcer_scanner:get_token_window(Mod, Offset, 45, 100),
         ?D({TokensWComments, BeforeReversed}),
         try_open(Offset, TokensWComments, BeforeReversed,
                  Context#open_context{imports=Imports}),
@@ -150,8 +150,8 @@ get_lib_dir(Dir) ->
     end.
 
 try_open(Offset, TokensWComments, BeforeReversedWComments, Context) ->
-    Tokens = erlide_text:strip_comments(TokensWComments),
-    BeforeReversed = erlide_text:strip_comments(BeforeReversedWComments),
+    Tokens = sourcer_text:strip_comments(TokensWComments),
+    BeforeReversed = sourcer_text:strip_comments(BeforeReversedWComments),
     try_open_aux(Offset, Tokens, BeforeReversed, Context).
 
 try_open_aux(Offset, Tokens, BeforeReversed, Context) ->
@@ -263,7 +263,7 @@ o_tokens([#token{kind=atom, value=Function}, #token{kind='('} | Rest],
     case consider_local(BeforeReversed) of
         true ->
             ?D(Rest),
-            o_local(Function, erlide_text:guess_arity(Rest),
+            o_local(Function, sourcer_text:guess_arity(Rest),
                     Context);
         false ->
             continue
@@ -307,7 +307,7 @@ o_macro_def([#token{kind='('}, #token{kind=atom, value=Value} | _]) ->
 
 o_record(Tokens, Offset, Value) ->
     {State, _Name, Prefix, _Fields} =
-        erlide_content_assist:check_record_tokens(upto_offset(Tokens, Offset)),
+        sourcer_content_assist:check_record_tokens(upto_offset(Tokens, Offset)),
     case State of
         record_want_field -> throw({open, {field, Value, Prefix}});
         record_want_dot_field -> throw({open, {field, Value, Prefix}});
@@ -327,7 +327,7 @@ o_record_def([#token{kind='('}, #token{value=Value, offset=O, length=L}, #token{
   when Offset=<O+L ->
     throw({open, {record, Value}});
 o_record_def([#token{kind='('}, #token{value=Value}, #token{kind=','} | Tokens], Offset) ->
-    Between = erlide_np_util:get_between_outer_pars(Tokens, '{', '}'),
+    Between = sourcer_np_util:get_between_outer_pars(Tokens, '{', '}'),
     o_record_def_aux(Between, Offset, Value, want_field).
 
 o_record_def_aux([], _Offset, Record, _) ->
@@ -335,7 +335,7 @@ o_record_def_aux([], _Offset, Record, _) ->
 o_record_def_aux([#token{offset=O, length=L, value=Field} | _], Offset, Record, want_field) when Offset<O+L ->
     throw({open, {field, Record, Field}});
 o_record_def_aux([#token{value=V} | _]=Tokens, Offset, Record, _) when V=:='('; V=:='{'; V=:='['; V=:='<<' ->
-    Rest = erlide_text:skip_expr(Tokens),
+    Rest = sourcer_text:skip_expr(Tokens),
     o_record_def_aux(Rest, Offset, Record, want_comma);
 o_record_def_aux([#token{value=','} | Rest], Offset, Record, want_comma) ->
     o_record_def_aux(Rest, Offset, Record, want_field);
@@ -344,7 +344,7 @@ o_record_def_aux([_ | Rest], Offset, Record, W) ->
 
 o_external(Module, Function, [_ | ParameterListTokens], Context) ->
     ?D({Module, Function, ParameterListTokens}),
-    A = erlide_text:guess_arity(ParameterListTokens),
+    A = sourcer_text:guess_arity(ParameterListTokens),
     ?D(A),
     P = get_source_from_module(Module, Context),
     throw({open, {external, Module, Function, A, P}});
@@ -427,7 +427,7 @@ replace_path_var_aux(Var, PathVars) ->
 
 get_external_1(FileName0, PathVars, IsRoot) ->
     FileName = replace_path_var(FileName0, PathVars),
-    FileNames = case IsRoot orelse filename:extension(FileName) == ".erlidex" of
+    FileNames = case IsRoot orelse filename:extension(FileName) == ".sourcerx" of
                     true ->
                         case file:read_file(FileName) of
                             {ok, B} ->
@@ -453,7 +453,7 @@ fx([FN0 | Rest], Fun, Fun2, PathVars, Parent, Done, Acc) ->
         true ->
             fx(Rest, Fun, Fun2, PathVars, Parent, Done, Acc);
         false ->
-            case Parent=:="root" orelse filename:extension(FN) == ".erlidex" of
+            case Parent=:="root" orelse filename:extension(FN) == ".sourcerx" of
                 true ->
                     {NewDone, NewAcc} = fx2(FN, Fun, Fun2, PathVars, Parent, Done, Acc),
                     fx(Rest, Fun, Fun2, PathVars, Parent, NewDone, NewAcc);
@@ -550,7 +550,7 @@ get_source_ebin(Mod) ->
 
 get_var(Var, S) ->
     ?D({Var, S}),
-    {ok, T, _} = erlide_scan:string(S),
+    {ok, T, _} = sourcer_scan:string(S),
     ?D(T),
     FV = find_var(T, Var),
     ?D(FV),

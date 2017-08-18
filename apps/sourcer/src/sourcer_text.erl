@@ -2,7 +2,7 @@
 %% Created: Mar 23, 2006
 %% @doc Some text-handling utilities
 
--module(erlide_text).
+-module(sourcer_text).
 
 %%
 %% Include files
@@ -30,7 +30,7 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 %%
 %% API Functions
@@ -229,7 +229,7 @@ guess_arity(Tokens, N) ->
 %% skip over an expression, checking parens, operators etc
 %%
 skip_expr([#token{kind=T} | Before]) when T =:= '{'; T =:= '['; T =:= '('; T =:= '<<' ->
-    A = skip_paren(Before, erlide_text:matching_paren(T)),
+    A = skip_paren(Before, sourcer_text:matching_paren(T)),
     ?D(A),
     case is_op2(A) of
         true ->
@@ -265,7 +265,7 @@ skip_paren([], _) ->
 skip_paren([#token{kind=P} | Rest], P) ->
     Rest;
 skip_paren([#token{kind=T} | Before], P) when T =:= '{'; T =:= '('; T =:= '['; T =:= '<<' ->
-    skip_paren(skip_paren(Before, erlide_text:matching_paren(T)), P);
+    skip_paren(skip_paren(Before, sourcer_text:matching_paren(T)), P);
 skip_paren([_ | Before], P) ->
     skip_paren(Before, P).
 
@@ -274,7 +274,7 @@ skip_block_end([]) ->
 skip_block_end([#token{kind='end'}|Rest]) ->
     Rest;
 skip_block_end([#token{kind=Tup} | Rest]) ->
-    R = case erlide_text:is_block_start_token(Tup) of
+    R = case sourcer_text:is_block_start_token(Tup) of
             true ->
                 skip_block_end(Rest);
             false ->

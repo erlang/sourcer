@@ -1,12 +1,12 @@
 %% Author: jakob
 %% Created: 7 nov 2010
--module(erlide_np_util).
+-module(sourcer_np_util).
 
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
 -include("sourcer_noparse.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 -export([extract_comments/1, split_after_dots/1, skip_to/2,
          get_between_outer_pars/3, compact_model/1, get_top_level_comments/2]).

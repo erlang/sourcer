@@ -1,4 +1,4 @@
--module(erlide_model).
+-module(sourcer_model).
 
 -export([
 		 init/2,
@@ -49,28 +49,28 @@ open_document(State, _Uri, _LangId, _Version, _Text) ->
 	?LOG({open_document, State, NewState}),
 	{ok, NewState}.
 
--spec change_document(state(), erlide_lsp_server:text_document_id(), integer(), [erlide_lsp_server:content_change()]) ->
+-spec change_document(state(), sourcer_lsp_server:text_document_id(), integer(), [sourcer_lsp_server:content_change()]) ->
 		  {'ok', state()} | {'error', any()}.
 change_document(State, _DocumentId, _Version, _Changes) ->
 	NewState = State,
 	?LOG({change_document, State, NewState}),
 	{ok, State}.
 
--spec close_document(state(), erlide_lsp_server:text_document_id()) ->
+-spec close_document(state(), sourcer_lsp_server:text_document_id()) ->
 		  {'ok', state()} | {'error', any()}.
 close_document(State, _DocumentId) ->
 	NewState = State,
 	?LOG({close_document, State, NewState}),
 	{ok, State}.
 
--spec save_document(state(), erlide_lsp_server:text_document_id()) ->
+-spec save_document(state(), sourcer_lsp_server:text_document_id()) ->
 		  {'ok', state()} | {'error', any()}.
 save_document(State, _DocumentId) ->
 	NewState = State,
 	?LOG({save_document, State, NewState}),
 	{ok, State}.
 
--spec change_watched_files(state(), [erlide_lsp_server:file_event()]) ->
+-spec change_watched_files(state(), [sourcer_lsp_server:file_event()]) ->
 		  {'ok', state()} | {'error', any()}.
 change_watched_files(State=#{files:=Files, parser:=Parser}, FileEvents) ->
 	NewFiles = lists:foldl(fun update_file_change/2, Files, FileEvents),

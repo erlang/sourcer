@@ -2,7 +2,7 @@
 %% Author: jakob (jakobce at g mail dot com)
 %% Created: 10 mar 2010
 
--module(erlide_search_server).
+-module(sourcer_search_server).
 
 %%
 %% Include files
@@ -45,7 +45,7 @@
 %% Macros and Records
 %%
 
--define(SERVER, erlide_search_server).
+-define(SERVER, sourcer_search_server).
 -define(N_MODULES_KEPT, 5).
 
 -record(module, {scanner_name :: atom(),
@@ -251,7 +251,7 @@ do_find_refs([{ScannerName, ModulePath} | Rest], Pattern, StateDir,
     Refs = get_module_refs(ScannerName, ModulePath, StateDir, Modules,
                            UpdateSearchServer),
     Mod = get_module_name(ModulePath),
-    Acc1 = Acc0 ++ erlide_search:find_data(Refs, Pattern, Mod, ModulePath),
+    Acc1 = Acc0 ++ sourcer_search:find_data(Refs, Pattern, Mod, ModulePath),
     do_find_refs(Rest, Pattern, StateDir, State, UpdateSearchServer, Acc1).
 
 get_module_name(ModulePath) ->

@@ -1,4 +1,4 @@
--module(erlide_xref).
+-module(sourcer_xref).
 
 -export([start/0,
          stop/0,
@@ -16,7 +16,7 @@
 
 %-define(DEBUG, 1).
 
--define(XREF, erlide_xref).
+-define(XREF, sourcer_xref).
 
 
 -include("dbglog.hrl").
@@ -30,7 +30,7 @@ start(undefined) ->
     erlang:yield(),
     xref:start(?XREF),
     xref:set_default(?XREF, [{verbose,false},{warnings,false}]),
-    %% 				  X= xref:add_release(erlide, code:lib_dir(),
+    %% 				  X= xref:add_release(sourcer, code:lib_dir(),
     %% 									  [{name, otp}]),
     %% 		  ok
     %% 	  end),

@@ -1,6 +1,6 @@
 %% Author: jakob
 %% Created: 30 aug 2010
--module(erlide_parsing_tests).
+-module(sourcer_parsing_tests).
 
 %%
 %% Include files
@@ -8,7 +8,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include("sourcer_noparse.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 %%
 %% Exported Functions
@@ -45,7 +45,7 @@ parse_small_functions_test_() ->
                    test_parse("f() ->\n    a."))].
 
 parsing_define_with_record_ref_test_() ->
-    %% http://www.assembla.com/spaces/erlide/tickets/602-parser-can-t-handle-record-definitions-in-defines
+    %% http://www.assembla.com/spaces/sourcer/tickets/602-parser-can-t-handle-record-definitions-in-defines
     [?_assertEqual({[#attribute{pos={{0,0,0},18},
                                 name=define,
                                 args=xx,
@@ -75,7 +75,7 @@ parsing_record_def1_test_() ->
     [?_assertEqual(Expected, Value)].
 
 parsing_function_with_macro_test_() ->
-    %% http://www.assembla.com/spaces/erlide/tickets/571-functions-defined-with-macros-confuses-the-model
+    %% http://www.assembla.com/spaces/sourcer/tickets/571-functions-defined-with-macros-confuses-the-model
     [?_assertEqual({[#function{pos = {{0, 0, 0},11},
                                name = '?f', arity = 0,
                                args = [], head = "", clauses = [],
@@ -100,7 +100,7 @@ parsing_when_clauses_test_() ->
 
 % this test is not relevant, since the function doc fixing is moved to java
 function_comments_only_toplevel_test_() ->
-    %% http://www.assembla.com/spaces/erlide/tickets/891-wrong-function-comment-in-edoc-view-and-hover
+    %% http://www.assembla.com/spaces/sourcer/tickets/891-wrong-function-comment-in-edoc-view-and-hover
     S = "" ++
             "f1()->\n"++
             "    %some comment here \n"++
@@ -153,25 +153,25 @@ replace_and_reparse_test_() ->
 %%
 
 test_parse(S) ->
-    {ok, Tokens, _EndPos} = erlide_scan:string(S, {0, 1}, [return_comments]),
-    {Forms, Comments, _Refs} = erlide_np:parse(Tokens),
+    {ok, Tokens, _EndPos} = sourcer_scan:string(S, {0, 1}, [return_comments]),
+    {Forms, Comments, _Refs} = sourcer_np:parse(Tokens),
     {Forms, Comments}.
 
 test_reparse(S) ->
-    erlide_scanner:create(testing),
-    erlide_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
+    sourcer_scanner:create(testing),
+    sourcer_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
                                 "/not_used_either"),
     {ok, Model} = sourcer_noparse:reparse(testing, false),
-    erlide_scanner:dispose(testing),
+    sourcer_scanner:dispose(testing),
     Model.
 
 test_replace_and_reparse(S, Offset, RemoveLength, NewText) ->
-    erlide_scanner:create(testing),
-    erlide_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
+    sourcer_scanner:create(testing),
+    sourcer_scanner:initial_scan(testing, "/tmp/should_not_be_used.erl", S,
                                 "/not_used_either"),
-    erlide_scanner:replace_text(testing, Offset, RemoveLength, NewText),
+    sourcer_scanner:replace_text(testing, Offset, RemoveLength, NewText),
     {ok, Model} = sourcer_noparse:reparse(testing, false),
-    erlide_scanner:dispose(testing),
+    sourcer_scanner:dispose(testing),
     Model.
 
 %% t() ->

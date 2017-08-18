@@ -1,12 +1,12 @@
 %% coding: utf-8
--module(erlide_scan_tests).
+-module(sourcer_scan_tests).
 
 %%
 %% Include files
 %%
 
 -include_lib("eunit/include/eunit.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 
 -define(D(X), begin Y=X, io:format("~p~n", [Y]), Y end).
 
@@ -207,5 +207,5 @@ test_scan(S) ->
     R.
 
 test_scan(S, L, C, O) ->
-    erlide_scan:string(S, {L, C, O}, [return]).
+    sourcer_scan:string(S, {L, C, O}, [return]).
 

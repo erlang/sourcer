@@ -2,24 +2,24 @@
 %% the functional interface for the "parser"
 %% returns forms, comments and referencs
 
--module(erlide_np).
+-module(sourcer_np).
 
 -export([parse/1]).
 
 -include("dbglog.hrl").
--include("erlide_token.hrl").
+-include("sourcer_token.hrl").
 -include("sourcer_noparse.hrl").
--include("erlide_search.hrl").
+-include("sourcer_search.hrl").
 
 -type form() :: #attribute{} | #clause{} | #function{} | #other{}.
 
 -spec parse([#token{}]) -> {[form()], [#token{}], [#ref{}]}.
 parse(Tokens) ->
-    {TokensWoComments, Comments} = erlide_np_util:extract_comments(Tokens),
-    Functions = erlide_np_util:split_after_dots(TokensWoComments),
+    {TokensWoComments, Comments} = sourcer_np_util:extract_comments(Tokens),
+    Functions = sourcer_np_util:split_after_dots(TokensWoComments),
     AutoImports = sourcer_util:add_auto_imported([]),
     {Forms, References} = classify_and_collect_forms(Functions, [], [], [], AutoImports),
-    ToplevelComments = erlide_np_util:get_top_level_comments(Forms, Comments),
+    ToplevelComments = sourcer_np_util:get_top_level_comments(Forms, Comments),
     {Forms, ToplevelComments, References}.
 
 classify_and_collect_forms([], Acc, RefsAcc, _Exports, _Imports) ->
@@ -60,7 +60,7 @@ get_type_attribute(Name, Offset, Line, Attribute, Args) ->
     ExternalRefs = get_refs(tl(AttrArgs), Extra, ?ARI_TYPESPEC),
     Arity = case Name of
                 'spec' ->
-                    erlide_text:guess_arity(Args);
+                    sourcer_text:guess_arity(Args);
                 _ ->
                     -1
             end,
@@ -109,7 +109,7 @@ get_other_attribute(Name, Offset, Line, Attribute, Args) ->
     #token{line=LastLine, offset=LastOffset,
            length=LastLength} = last_not_eof(Attribute),
     PosLength = LastOffset - Offset + LastLength,
-    Between = erlide_np_util:get_between_outer_pars(Attribute, '(', ')'),
+    Between = sourcer_np_util:get_between_outer_pars(Attribute, '(', ')'),
     Extra = to_string(Between),
     {AttrArgs, Exports, Imports} = get_attribute_args(Name, Between, Args),
     {#attribute{pos={{Line, LastLine, Offset}, PosLength},
@@ -130,7 +130,7 @@ get_attribute_args(export, Between, _Args) ->
 get_attribute_args(record, Between, _Args) ->
     [RecordToken | _] = Between,
     RecordName = RecordToken#token.value,
-    Tokens = erlide_np_util:get_between_outer_pars(Between, '{', '}'),
+    Tokens = sourcer_np_util:get_between_outer_pars(Between, '{', '}'),
     R = {RecordName, field_list_from_tokens(Tokens)},
     {R, [], []};
 get_attribute_args(_, _Between, Args) ->
@@ -146,7 +146,7 @@ check_class(_X) ->
     other.
 
 get_first_of_kind(Kind, Tokens) ->
-    case erlide_np_util:skip_to(Tokens, Kind) of
+    case sourcer_np_util:skip_to(Tokens, Kind) of
         [#token{kind=Kind, value=Value} | _] ->
             Value;
         _ ->
@@ -172,8 +172,8 @@ field_list_from_tokens(_) ->
     [].
 
 to_string(Tokens) ->
-    S = erlide_scan_model:tokens_to_string(Tokens),
-    erlide_text:strip(S).
+    S = sourcer_scan_model:tokens_to_string(Tokens),
+    sourcer_text:strip(S).
 %%     unspacify(S).
 
 get_head(T) ->
@@ -186,7 +186,7 @@ get_head(T) ->
     end.
 
 get_args(T) ->
-    case erlide_np_util:get_between_outer_pars(T, '(', ')') of
+    case sourcer_np_util:get_between_outer_pars(T, '(', ')') of
         [] ->
             "";
         P ->
@@ -287,8 +287,8 @@ get_clause([#token{kind=AtomOrMacro, value=Name, line=Line, offset=Offset, lengt
      ExternalRefs}.
 
 get_function_args(Tokens) ->
-    P = erlide_np_util:get_between_outer_pars(Tokens, '(', ')'),
-    L = erlide_text:split_comma_list(P),
+    P = sourcer_np_util:get_between_outer_pars(Tokens, '(', ')'),
+    L = sourcer_text:split_comma_list(P),
     [to_string(A) || A <- L].
 
 fix_code_refs(ClausesAndRefs, Function, Imports) ->
@@ -337,13 +337,13 @@ get_refs_in_code([], Acc) ->
 get_refs_in_code([#token{kind=atom, value=M, offset=Offset}, #token{kind=':'},
                   #token{kind=atom, value=F, offset=Offset2, length=Length2},
                   #token{kind='('} | Rest], Acc) ->
-    Arity = erlide_text:guess_arity(Rest),
+    Arity = sourcer_text:guess_arity(Rest),
     R = {Offset, Length2+Offset2-Offset,
          #external_call{module = M, function=F, arity=Arity}},
     get_refs_in_code(Rest, [R | Acc]);
 get_refs_in_code([#token{kind=atom, value=F, offset=Offset, length=Length},
                   #token{kind='('} | Rest], Acc) ->
-    Arity = erlide_text:guess_arity(Rest),
+    Arity = sourcer_text:guess_arity(Rest),
     R = {Offset, Length, #local_call{function=F, arity=Arity}},
     get_refs_in_code(Rest, [R | Acc]);
 get_refs_in_code([#token{kind=macro, value=M, offset=Offset, length=Length} | Rest],
@@ -354,7 +354,7 @@ get_refs_in_code([#token{kind='#', offset=Offset},
                   #token{kind=atom, value=Record, offset=Offset2, length=Length2} | Rest],
                  Acc) ->
     R = {Offset, Length2+Offset2-Offset, #record_ref{name=Record}},
-    {NewRest, Fields, RightSides} = erlide_np_records:check_fields(Rest, Record),
+    {NewRest, Fields, RightSides} = sourcer_np_records:check_fields(Rest, Record),
     NewAcc = get_refs_in_code(RightSides, Acc),
     get_refs_in_code(NewRest, Fields ++ [R | NewAcc]);
 get_refs_in_code([#token{kind=var, value=V, offset=Offset, length=Length} | Rest],

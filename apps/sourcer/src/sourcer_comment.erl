@@ -1,7 +1,7 @@
 %% Author: jakob
 %% Created: Mar 23, 2006
 
--module(erlide_comment).
+-module(sourcer_comment).
 
 %%
 %% Include files
@@ -22,7 +22,7 @@
 
 toggle_comment(Text, From, Length) ->
     ?D({Text, From, Length}),
-    {_, _, Lines} = erlide_text:get_text_and_lines(Text, From, Length),
+    {_, _, Lines} = sourcer_text:get_text_and_lines(Text, From, Length),
     ?D(Lines),
     LineF = case lists:all(fun(L) -> is_comment_line(L) end, Lines) of
                 true ->

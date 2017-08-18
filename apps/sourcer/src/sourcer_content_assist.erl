@@ -2,7 +2,7 @@
 %% Created: 20 jan 2009
 %% Description: Content assist stuff
 
--module(erlide_content_assist).
+-module(sourcer_content_assist).
 
 -author(jakob).
 
@@ -13,7 +13,7 @@
 %% -define(DEBUG, 1).
 
 -include("dbglog.hrl").
--include("include/erlide_token.hrl").
+-include("include/sourcer_token.hrl").
 
 
 %%
@@ -28,7 +28,7 @@
 
 %% check if the text is where to enter record field
 check_record(S) ->
-    case (catch erlide_scan:string(S)) of
+    case (catch sourcer_scan:string(S)) of
         {ok, Tokens, _Pos} ->
             ?D({check_record, Tokens}),
             {State, Name, Prefix, Fields} =
@@ -41,7 +41,7 @@ check_record(S) ->
 %% get list of variables matching prefix
 %% the variables are returne as tokens
 get_variables(Src, Prefix) ->
-    case erlide_scan:string(Src) of
+    case sourcer_scan:string(Src) of
         {ok, Tokens, _Pos} ->
             ?D({ok, Tokens, _Pos}),
             {ok, get_var_tokens(Tokens, Prefix)};
@@ -49,7 +49,7 @@ get_variables(Src, Prefix) ->
             none
     end.
 
-%% final OtpErlangObject res = b.rpcx("erlide_content_assist",
+%% final OtpErlangObject res = b.rpcx("sourcer_content_assist",
 %% "get_variables", "ss", src, prefix);
 
 
@@ -180,6 +180,6 @@ check_record_tokens(_State, [_ | Rest], W, R, B, Fields, PrevR) -> % 10
     check_record_tokens(no_record, Rest, W, R, B, Fields, PrevR).
 
 get_function_head(Fun, Arity) ->
-    erlide_otp_doc:fix_proposals([{Fun, Arity}], [""], 0).
+    sourcer_otp_doc:fix_proposals([{Fun, Arity}], [""], 0).
 
 

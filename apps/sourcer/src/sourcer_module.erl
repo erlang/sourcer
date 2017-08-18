@@ -42,11 +42,11 @@ loop(State) ->
             From ! {module_content, list_to_binary(State#state.content)},
             loop(State);
         {change, Offset, Length, Text}=_Msg ->
-            % erlide_log:logp("Module ~s:: ~p", [Name, _Msg]),
+            % sourcer_log:logp("Module ~s:: ~p", [Name, _Msg]),
             Content1 = replace_text(State#state.content, Offset, Length, Text),
             loop(State#state{content=Content1});
         _Msg ->
-            %erlide_log:logp("Unknown message in module ~s: ~p", [State#state.name, _Msg]),
+            %sourcer_log:logp("Unknown message in module ~s: ~p", [State#state.name, _Msg]),
             loop(State)
     end.
 

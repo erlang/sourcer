@@ -1,7 +1,7 @@
 %% @author jakob
 %% the functional part of searching
 
--module(erlide_search).
+-module(sourcer_search).
 
 %%
 %% Include files
@@ -11,7 +11,7 @@
 
 -include("dbglog.hrl").
 
--include("include/erlide_search.hrl").
+-include("include/sourcer_search.hrl").
 
 %%
 %% Exported Functions

@@ -4,10 +4,10 @@
 
 files(Files, Options) ->
     try
-        %erlide_log:logp(Files),
-        %erlide_log:logp(Options),
+        %sourcer_log:logp(Files),
+        %sourcer_log:logp(Options),
         [begin
-            %erlide_log:logp(F),
+            %sourcer_log:logp(F),
             edoc:files([F], Options) end || F<-Files]
     catch
         _:Err ->

@@ -1,4 +1,4 @@
--module(erlide_parse).
+-module(sourcer_parse).
 
 %% API
 -export([consult/1]).

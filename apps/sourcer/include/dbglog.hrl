@@ -1,6 +1,6 @@
-%-define(Debug(T), erlide_log:erlangLog(?MODULE, ?LINE, finest, T)).
-%-define(DebugStack(T), erlide_log:erlangLogStack(?MODULE, ?LINE, finest, T)).
-%-define(Info(T), erlide_log:erlangLog(?MODULE, ?LINE, info, T)).
+%-define(Debug(T), sourcer_log:erlangLog(?MODULE, ?LINE, finest, T)).
+%-define(DebugStack(T), sourcer_log:erlangLogStack(?MODULE, ?LINE, finest, T)).
+%-define(Info(T), sourcer_log:erlangLog(?MODULE, ?LINE, info, T)).
 
 -ifdef(DEBUG).
 -ifdef(IO_FORMAT_DEBUG).

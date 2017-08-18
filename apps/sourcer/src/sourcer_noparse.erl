@@ -25,8 +25,8 @@
 
 -include("dbglog.hrl").
 -include("sourcer_noparse.hrl").
--include("erlide_scanner_server.hrl").
--include("erlide_search.hrl").
+-include("sourcer_scanner_server.hrl").
+-include("sourcer_search.hrl").
 
 %%
 %% API Functions
@@ -60,7 +60,7 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir,
               | {error, term(), term()}.
 reparse(ScannerName, UpdateSearchServer) ->
     try
-        Tokens = erlide_scanner:get_tokens(ScannerName),
+        Tokens = sourcer_scanner:get_tokens(ScannerName),
         {Model, _Refs} = do_parse(ScannerName, Tokens, "", UpdateSearchServer),
         {ok, Model}
     catch
@@ -97,23 +97,23 @@ get_module_refs(ScannerName, ModulePath, StateDir, UpdateSearchServer) ->
 get_tokens(ScannerName, ModuleFileName, InitialText, StateDir) ->
     case whereis(ScannerName) of
         undefined ->
-            Module = erlide_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir),
-            erlide_scan_model:get_all_tokens(Module);
+            Module = sourcer_scanner:initial_scan_0(ScannerName, ModuleFileName, InitialText, StateDir),
+            sourcer_scan_model:get_all_tokens(Module);
         _ ->
-            erlide_scanner:get_tokens(ScannerName)
+            sourcer_scanner:get_tokens(ScannerName)
     end.
 
 do_parse(ScannerName, Tokens, StateDir, UpdateSearchServer) ->
-    {Forms, Comments, References} = erlide_np:parse(Tokens),
+    {Forms, Comments, References} = sourcer_np:parse(Tokens),
     ?D(Forms),
     Model = #model{forms=Forms, comments=Comments},
-    CompactModel = erlide_np_util:compact_model(Model),
+    CompactModel = sourcer_np_util:compact_model(Model),
     ?D(CompactModel),
     update_search_server(UpdateSearchServer, ScannerName, References),
     {CompactModel, References}.
 
 update_search_server(true, ScannerName, Refs) ->
-    erlide_search_server:add_module_refs(ScannerName, Refs);
+    sourcer_search_server:add_module_refs(ScannerName, Refs);
 update_search_server(_, _, _) ->
     ok.
 
