@@ -36,8 +36,7 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir,
                            Tokens = get_tokens(ScannerName, ModuleFileName,
                                                InitialText, StateDir),
                            {Model, Refs} =
-                               do_parse(ScannerName, Tokens, StateDir,
-                                        UpdateSearchServer),
+                               do_parse(ScannerName, Tokens, UpdateSearchServer),
                            {Model, Refs}
                    end,
         {Model, Refs} = RenewFun(ModuleFileName),
@@ -53,7 +52,7 @@ initial_parse(ScannerName, ModuleFileName, InitialText, StateDir,
 reparse(ScannerName, UpdateSearchServer) ->
     try
         Tokens = sourcer_scanner:get_tokens(ScannerName),
-        {Model, _Refs} = do_parse(ScannerName, Tokens, "", UpdateSearchServer),
+        {Model, _Refs} = do_parse(ScannerName, Tokens, UpdateSearchServer),
         {ok, Model}
     catch
         error:Reason ->
@@ -95,7 +94,7 @@ get_tokens(ScannerName, ModuleFileName, InitialText, StateDir) ->
             sourcer_scanner:get_tokens(ScannerName)
     end.
 
-do_parse(ScannerName, Tokens, StateDir, UpdateSearchServer) ->
+do_parse(ScannerName, Tokens, UpdateSearchServer) ->
     {Forms, Comments, References} = sourcer_np:parse(Tokens),
     ?D(Forms),
     Model = #model{forms=Forms, comments=Comments},

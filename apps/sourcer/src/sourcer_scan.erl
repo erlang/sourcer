@@ -36,7 +36,7 @@ string(String, {L, C, O}, Opts) ->
     end.
 
 string2(String, {L, C, O}, Opts) ->
-    case erl_scan_local:string(String, {L, C}, [text, return |Opts]) of
+    case erl_scan:string(String, {L, C}, [text, return |Opts]) of
         {ok, Tokens, {L1, C1}} ->
             {ok, NewTokens, O1} = convert_tokens(Tokens, O),
             {ok, filter_tokens(NewTokens, Opts), {L1, C1, O1}};
@@ -45,7 +45,7 @@ string2(String, {L, C, O}, Opts) ->
     end.
 
 reserved_word(Word) ->
-    erl_scan_local:reserved_word(Word).
+    erl_scan:reserved_word(Word).
 
 filter_ws(L) ->
     lists:filter(fun(#token{kind=Kind}) -> Kind =/= white_space end, L).
@@ -77,27 +77,27 @@ convert_tokens(Tokens, O) ->
 
 convert_tokens([], Ofs, Acc) ->
     {ok, lists:reverse(Acc), Ofs};
-convert_tokens([{'?', [{line, L}, {column, O1}, {text, "?"}]}, {'?', [{line, L}, {column, O2}, {text, "?"}]}, {atom, [{line, L}, {column, O}, {text, Txt}], _V} | Rest],
+convert_tokens([{'?', [{text, "?"}, {location, {L, O1}}]}, {'?', [{text, "?"}, {location, {L, O2}}]}, {atom, [{text, Txt}, {location, {L, O}}], _V} | Rest],
                Ofs, Acc) when O2=:=O1+1; O=:=O2+1 ->
     Txt1 = [$?, $? | Txt],
     T = make_macro(L, Ofs, length(Txt1), Txt1),
     convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [{line, L}, {column, O1}|_]}, {'?', [{line, L}, {column, O2}|_]}, {var, [{line, L}, {column, O}, {text, Txt}], _V} | Rest],
+convert_tokens([{'?', [_, {location, {L, O1}}]}, {'?', [_, {location, {L, O2}}]}, {var, [{text, Txt}, {location, {L, O}}], _V} | Rest],
                Ofs, Acc) when O2=:=O1+1; O=:=O2+1 ->
     Txt1 = [$?, $? | Txt],
     T = make_macro(L, Ofs, length(Txt1), Txt1),
     convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [{line, L}, {column, O}|_]}, {atom, [{line, L}, {column, O1}, {text, Txt}], _V} | Rest],
+convert_tokens([{'?', [_, {location, {L, O}}]}, {atom, [{text, Txt}, {location, {L, O1}}], _V} | Rest],
                Ofs, Acc) when O1=:=O+1->
     Txt1 = [$? | Txt],
     T = make_macro(L, Ofs, length(Txt1), Txt1),
     convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [{line, L}, {column, O}|_]}, {var, [{line, L}, {column, O1}, {text, Txt}], _V} | Rest],
+convert_tokens([{'?', [_, {location, {L, O}}]}, {var, [{text, Txt}, {location, {L, O1}}], _V} | Rest],
                Ofs, Acc) when O1=:=O+1->
     Txt1 = [$? | Txt],
     T = make_macro(L, Ofs, length(Txt1), Txt1),
     convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{dot, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
+convert_tokens([{dot, [{text,Txt}, {location, {L, _O}}]} | Rest], Ofs, Acc) ->
     %% erl_scan conflates the dot with following whitespace.
     T = #token{kind=dot, line=L, offset=Ofs, length=1, text=[hd(Txt)]},
     case Txt of
@@ -107,13 +107,13 @@ convert_tokens([{dot, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
             T1 = #token{kind=white_space, line=L, offset=Ofs+1, length=length(Txt)-1, text=list_to_binary(tl(Txt))},
             convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
     end;
-convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}], _} | Rest], Ofs, Acc) when What==white_space; What==comment ->
+convert_tokens([{What, [{text,Txt}, {location, {L, _O}}], _} | Rest], Ofs, Acc) when What==white_space; What==comment ->
     T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=unicode:characters_to_binary(Txt)},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
-convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}], Sym} | Rest], Ofs, Acc) ->
+convert_tokens([{What, [{text,Txt}, {location, {L, _O}}], Sym} | Rest], Ofs, Acc) ->
     T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt, value=Sym},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
-convert_tokens([{What, [{line,L}, {column,_O}, {text,Txt}]} | Rest], Ofs, Acc) ->
+convert_tokens([{What, [{text,Txt}, {location, {L, _O}}]} | Rest], Ofs, Acc) ->
     T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt},
     convert_tokens(Rest, Ofs+length(Txt), [T | Acc]).
 

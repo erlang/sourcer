@@ -27,7 +27,7 @@ split_lines_w_lengths([C | Text], Length, LineAcc, Acc) ->
     split_lines_w_lengths(Text, Length+1, [C | LineAcc], Acc).
 
 get_lines_info(Binary) when is_binary(Binary) ->
-    Lines = binary:split(Binary, [<<"\r">>, <<"\n">>, <<"\r\n">>], [global]).
+    _Lines = binary:split(Binary, [<<"\r">>, <<"\n">>, <<"\r\n">>], [global]).
 
 
 %% Find a line from [{Length, Line
