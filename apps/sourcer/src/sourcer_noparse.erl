@@ -10,7 +10,7 @@
 %% called from Erlang
 -export([get_module_refs/4]).
 
--define(DEBUG, 1).
+%-define(DEBUG, 1).
 -define(IO_FORMAT_DEBUG, 1).
 
 -define(SERVER, sourcer_noparse).

@@ -108,7 +108,7 @@
 	?DEBUG("OPEN::~p~n", [Item]),
 	#{uri:=URI, text:=Text}=Item,
 	Open = State#state.open_files,
-	NewOpen = [{URI, Text, sourcer_documents:process_file(URI, Text)}|Open],
+	NewOpen = sourcer_documents:open_file(State#state.open_files, URI, Text),
 	State#state{open_files=NewOpen}.
 
 %% TODO: this is for full sync, handle incremental changes too
@@ -169,8 +169,9 @@
 
 'textDocument/references'(State, #{textDocument:=#{uri:=URI}, position:=Position, context:=Context}, Reporter) ->
 	Source = sourcer_documents:get_element(State#state.open_files, URI, Position),
-	{_, Refs} = sourcer_documents:get_refs(State#state.open_files, URI),
-	?DEBUG("RREEFF: ~p~n", [Source]),
+	XX = sourcer_documents:get_refs(State#state.open_files, URI),
+	?DEBUG("RREEFF: ~p~n", [XX]),
+	{_, Refs,_} = XX,
 	Res = [],
 	Reporter({value, Res}).
 
@@ -178,9 +179,10 @@
 	Res = [],
 	Reporter({value, Res}).
 
-'textDocument/documentSymbol'(State, URI, Reporter) ->
-	?DEBUG("STATE=~p~n", [State#state.open_files]),
-	{_, Refs} = sourcer_documents:get_refs(State#state.open_files, URI),
+'textDocument/documentSymbol'(State, #{textDocument:=#{uri:=URI}}, Reporter) ->
+	XX = sourcer_documents:get_refs(State#state.open_files, URI),
+	?DEBUG("SYM URI=~p~nSTATE=~p~n", [URI, XX]),
+	{_, Refs,_} = XX,
 	Res = convert_refs(Refs, URI),
 	Reporter({value, Res}).
 
@@ -239,10 +241,12 @@ print_name(Data) ->
 	{Kind, Name, Key} = case Data of 
 		{KK, NN} ->
 			{KK, NN, ''};
+		{KK, NN, _, _} ->
+			{KK, NN, ''};
 		E ->
 			E
 	end,
-	case  Key of
+	case  Key of 
 		'' ->	
 			iolist_to_binary(io_lib:format("~s", [Name]));
 		_ ->

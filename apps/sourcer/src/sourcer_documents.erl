@@ -2,6 +2,7 @@
 
 -export([
     get_sync_value/0,
+	open_file/3,
     update_file/3,
     get_text/2,
     get_refs/2,
@@ -24,9 +25,14 @@
 get_sync_value() ->
     1.
 
+open_file(Open, URI, Text) ->
+	NewOpen = [{URI, Text, sourcer_documents:process_file(URI, Text)}|Open],
+	?DEBUG("***** OPEN---+++ ~p~n", [URI]),
+	NewOpen.
+
 update_file(Open, URI, [#{text:=Text}]) ->
 	NewOpen = lists:keyreplace(URI, 1, Open, {URI, Text, process_file(URI, Text)}),
-	?DEBUG("---+++ ~p~n", [NewOpen]),
+	?DEBUG("***** CHANGE---+++ ~p~n", [URI]),
 	NewOpen;
 update_file(Open, _URI, _Changes) ->
 	Open.
@@ -36,6 +42,7 @@ get_text(State, URI) ->
 	Text.
 
 get_refs(State, URI) ->
+?DEBUG("URI:: ~p~nState--->>>> ~p~n", [URI, State]),
 	{URI, _Text, Data} = lists:keyfind(URI, 1, State),
 	Data.
 
@@ -46,9 +53,9 @@ parse_file(File, Text) ->
 			TText,
 			".", false) of
 		{ok, {model, AST, _}, Refs} ->
-			io:format("00* ~p~n", [Refs]),
+			%io:format("00* ~p~n", [Refs]),
 			{Lines, _} = get_line_info(TText),
-			io:format("000 ~p~n", [Lines]),
+			%io:format("000 ~p~n", [Lines]),
 			{ok, AST, Refs, Lines};
 		Err ->
 			Err
@@ -57,7 +64,7 @@ parse_file(File, Text) ->
 process_file(URI, Text) ->
 	case parse_file(URI, Text) of
 		{ok, AST, Refs, Lines} ->
-			io:format("Parsed: ~p~n   ~p~n??????~p~n", [URI, Refs, Lines]),
+			%io:format("Parsed: ~p~n   ~p~n??????~p~n", [URI, Refs, Lines]),
 			{AST, Refs, Lines};
 		Err ->
 			io:format("Parse error: ~p ~p~n", [URI, Err]),
@@ -78,9 +85,9 @@ get_element(Data, URI, #{character:=C, line:=L}) ->
 	{Ofs,Len,_} = get_line_info(L, Lines),
 	%% FIXME!
 	Refs1 = lists:filter(fun filter_defs/1, Refs),
-	io:format("refs1 ~p ~n", [{Refs1, Ofs, Len}]),
+	%io:format("refs1 ~p ~n", [{Refs1, Ofs, Len}]),
 	Refs2 = Refs1,
-	io:format("refs2 ~p ~n", [Refs2]),
+	%io:format("refs2 ~p ~n", [Refs2]),
 	case Refs2 of
 		[] -> [];
 		_ -> lists:last(Refs2)
