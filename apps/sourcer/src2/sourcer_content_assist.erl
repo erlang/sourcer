@@ -8,7 +8,7 @@
 
 %% -define(DEBUG, 1).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 -include("include/sourcer_token.hrl").
 
 

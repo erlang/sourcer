@@ -1,5 +1,5 @@
 .vscode/**
 .gitignore
 erl_crash.dump
-
 .settings/**
+_build/**

@@ -9,10 +9,10 @@
          template_indent_lines/6
         ]).
 
-%% -define(IO_FORMAT_DEBUG, 1).
+%% 
 %% -define(DEBUG, 1).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 -include("include/sourcer_token.hrl").
 
 %% TODO: change into multiples of IndentW

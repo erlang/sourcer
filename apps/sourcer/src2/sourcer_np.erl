@@ -6,7 +6,7 @@
 
 -export([parse/1]).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 -include("sourcer_token.hrl").
 -include("sourcer_noparse.hrl").
 -include("sourcer_search.hrl").

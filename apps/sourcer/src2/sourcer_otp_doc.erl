@@ -17,7 +17,7 @@
 
 %% -define(DEBUG, 1).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 
 %% recursively return tags for which Fun returns true
 %%

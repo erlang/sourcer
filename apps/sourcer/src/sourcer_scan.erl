@@ -1,60 +1,108 @@
 -module(sourcer_scan).
 
--export([string/1,
+-define(DEBUG, true).
+-include("debug.hrl").
+
+-export([line_info/1,
+         string/1,
          string/2,
          string/3,
          reserved_word/1,
-         filter_ws/1,
-         filter_comments/1,
-         filter_ws_comments/1]).
+         filter_ws_tokens/1,
+         filter_comment_tokens/1,
+         filter_ws_comment_tokens/1,
+         filter_tokens/2]).
 
--include("sourcer_token.hrl").
+-export([convert_token/1]).
 
+-type token() ::  {
+        Kind :: atom(), 
+        Location :: {integer(), integer()}, 
+        Text :: string(), 
+        Value :: term()
+    }.
+
+-type line_info() :: {
+        Index :: integer(),
+        Offset :: integer(),
+        Length :: integer(),
+        Indent :: string()
+    }.
+
+-export_type([token/0, line_info/0]).
+
+-spec line_info(string()) -> [line_info()].
+line_info(String) ->
+    Lines = re:split(String, "(\r\n|\r|\n)", [{return, list}]),
+    {Result, _} = lists:mapfoldl(fun create_line_info/2, {0, 0}, Lines),
+    lists:flatten(Result).
+
+create_line_info("\r\n", {LineNo, Offset}) ->
+    {[], {LineNo+1, Offset+2}};
+create_line_info("\n", {LineNo, Offset}) ->
+    {[], {LineNo+1, Offset+1}};
+create_line_info("\r", {LineNo, Offset}) ->
+    {[], {LineNo+1, Offset+1}};
+create_line_info(Line, {LineNo, Offset}) ->
+    Len = length(Line),
+    {[{LineNo, Offset, Len, get_indent(Line)}], {LineNo, Offset+Len}}.
+
+get_indent(String) ->
+    lists:takewhile(fun is_white_space/1, String).
+
+-define(WHITE_SPACE(C),
+        is_integer(C) andalso
+         (C >= $\000 andalso C =< $\s orelse C >= $\200 andalso C =< $\240)).
+is_white_space(C) -> ?WHITE_SPACE(C).
+
+-spec string(string()) -> {ok, [token()], any()} | {error, any()}.
 string(String) ->
     string(String, {0, 1}).
 
-string(String, Pos) when is_tuple(Pos) ->
+string(String, {_L, _C}=Pos) ->
     string(String, Pos, []);
 string(String, Opts) when is_list(Opts) ->
     string(String, {0, 1}, Opts).
 
 string(String, {L, C}, Opts) ->
-    string(String, {L, C, 0}, Opts);
-string(String, {L, C, O}, Opts) ->
-    case string2(String, {L, C, O}, Opts) of
+    case string2(String, {L, C}, Opts) of
         {ok, _, _}=R ->
             R;
         {error, {_, _, {_, Quote, _}}, _} ->
-            case string2(String++[Quote], {L, C, O}, Opts) of
+            case string2(String++[Quote], {L, C}, Opts) of
                 {ok, _, _}=R1 ->
                     R1;
-                _Err ->
-                    _Err
+                Err ->
+                    Err
             end;
-        _Err2 ->
-            _Err2
+        Err2 ->
+            Err2
     end.
 
-string2(String, {L, C, O}, Opts) ->
+string2(String, {L, C}, Opts) ->
     case erl_scan:string(String, {L, C}, [text, return |Opts]) of
         {ok, Tokens, {L1, C1}} ->
-            {ok, NewTokens, O1} = convert_tokens(Tokens, O),
-            {ok, filter_tokens(NewTokens, Opts), {L1, C1, O1}};
-        _Err ->
-            _Err
+            Result = convert_tokens(Tokens),
+            {ok, Result, {L1, C1}};
+        Err ->
+            Err
     end.
 
 reserved_word(Word) ->
     erl_scan:reserved_word(Word).
 
-filter_ws(L) ->
-    lists:filter(fun(#token{kind=Kind}) -> Kind =/= white_space end, L).
+filter_tokens_by_kinds(Tokens, Kinds) ->
+?D(Tokens),
+    lists:filter(fun({Kind,_, _, _}) -> not lists:member(Kind, Kinds) end, Tokens).
 
-filter_comments(L) ->
-    lists:filter(fun(#token{kind=Kind}) -> Kind =/= comment end, L).
+filter_ws_tokens(L) ->
+    filter_tokens_by_kinds(L, [white_space]).
 
-filter_ws_comments(L) ->
-    lists:filter(fun(#token{kind=Kind}) -> (Kind =/= comment) and (Kind =/= white_space) end, L).
+filter_comment_tokens(L) ->
+    filter_tokens_by_kinds(L, [comment]).
+
+filter_ws_comment_tokens(L) ->
+    filter_tokens_by_kinds(L, [white_space, comment]).
 
 filter_tokens(Tokens, Opts) ->
     case {lists:member(return, Opts),
@@ -65,59 +113,88 @@ filter_tokens(Tokens, Opts) ->
         {_, true, true} ->
             Tokens;
         {_, true, false} ->
-            filter_ws(Tokens);
+            filter_ws_tokens(Tokens);
         {_, false, true} ->
-            filter_comments(Tokens);
+            filter_comment_tokens(Tokens);
         {_, false, false} ->
-            filter_ws_comments(Tokens)
+            filter_ws_comment_tokens(Tokens)
     end.
 
-convert_tokens(Tokens, O) ->
-    convert_tokens(Tokens, O, []).
+convert_tokens(Tokens) ->
+    convert_tokens(Tokens, []).
 
-convert_tokens([], Ofs, Acc) ->
-    {ok, lists:reverse(Acc), Ofs};
-convert_tokens([{'?', [{text, "?"}, {location, {L, O1}}]}, {'?', [{text, "?"}, {location, {L, O2}}]}, {atom, [{text, Txt}, {location, {L, O}}], _V} | Rest],
-               Ofs, Acc) when O2=:=O1+1; O=:=O2+1 ->
-    Txt1 = [$?, $? | Txt],
-    T = make_macro(L, Ofs, length(Txt1), Txt1),
-    convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [_, {location, {L, O1}}]}, {'?', [_, {location, {L, O2}}]}, {var, [{text, Txt}, {location, {L, O}}], _V} | Rest],
-               Ofs, Acc) when O2=:=O1+1; O=:=O2+1 ->
-    Txt1 = [$?, $? | Txt],
-    T = make_macro(L, Ofs, length(Txt1), Txt1),
-    convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [_, {location, {L, O}}]}, {atom, [{text, Txt}, {location, {L, O1}}], _V} | Rest],
-               Ofs, Acc) when O1=:=O+1->
-    Txt1 = [$? | Txt],
-    T = make_macro(L, Ofs, length(Txt1), Txt1),
-    convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{'?', [_, {location, {L, O}}]}, {var, [{text, Txt}, {location, {L, O1}}], _V} | Rest],
-               Ofs, Acc) when O1=:=O+1->
-    Txt1 = [$? | Txt],
-    T = make_macro(L, Ofs, length(Txt1), Txt1),
-    convert_tokens(Rest, Ofs+length(Txt1), [T | Acc]);
-convert_tokens([{dot, [{text,Txt}, {location, {L, _O}}]} | Rest], Ofs, Acc) ->
+convert_tokens([], TokensAcc) ->
+    lists:reverse(TokensAcc);
+convert_tokens([{white_space, Ann, V}=T0 | Rest], TokensAcc) ->
+    case V of   
+        "\n" ->
+            convert_tokens(Rest, [convert_token(T0) | TokensAcc]);
+        [$\n | Text] ->
+            Ann1 = erl_anno:set_text("\n", Ann),
+            T1 = {white_space, Ann1, "\n"},
+            Ann2 = erl_anno:set_text(Text, Ann),
+            L = erl_anno:line(Ann2),
+            C = erl_anno:column(Ann2),
+            Ann3 = erl_anno:set_location({L+1,C}, Ann2),
+            T2 = {white_space, Ann3, Text},
+            convert_tokens(Rest, [convert_token(T2), convert_token(T1) | TokensAcc]);
+        _ ->
+            convert_tokens(Rest, [convert_token(T0) | TokensAcc])
+    end;
+convert_tokens([{'?', Ann1}, {'?', Ann2}, {atom, Ann3, _} | Rest], TokensAcc) ->
+    Txt1 = lists:append([erl_anno:text(Ann1),erl_anno:text(Ann2),erl_anno:text(Ann3)]),
+    T = make_macro(Ann1, Txt1),
+    convert_tokens(Rest, [convert_token(T) | TokensAcc]);
+convert_tokens([{'?', Ann1}, {'?', Ann2}, {var, Ann3, _} | Rest], TokensAcc) ->
+    Txt1 = lists:append([erl_anno:text(Ann1),erl_anno:text(Ann2),erl_anno:text(Ann3)]),
+    T = make_macro(Ann1, Txt1),
+    convert_tokens(Rest, [convert_token(T) | TokensAcc]);
+convert_tokens([{'?', Ann1}, {atom, Ann3, _} | Rest], TokensAcc) ->
+    Txt1 = lists:append([erl_anno:text(Ann1),erl_anno:text(Ann3)]),
+    T = make_macro(Ann1, Txt1),
+    convert_tokens(Rest, [convert_token(T) | TokensAcc]);
+convert_tokens([{'?', Ann1}, {var, Ann3, _} | Rest], TokensAcc) ->
+    Txt1 = lists:append([erl_anno:text(Ann1),erl_anno:text(Ann3)]),
+    T = make_macro(Ann1, Txt1),
+    convert_tokens(Rest, [convert_token(T) | TokensAcc]);
+convert_tokens([{dot, Ann}=T0 | Rest], TokensAcc) ->
     %% erl_scan conflates the dot with following whitespace.
-    T = #token{kind=dot, line=L, offset=Ofs, length=1, text=[hd(Txt)]},
+    Txt = erl_anno:text(Ann),
     case Txt of
         "." ->
-            convert_tokens(Rest, Ofs+1, [T | Acc]);
+            convert_tokens(Rest, [convert_token(T0) | TokensAcc]);
         _ ->
-            T1 = #token{kind=white_space, line=L, offset=Ofs+1, length=length(Txt)-1, text=list_to_binary(tl(Txt))},
-            convert_tokens(Rest, Ofs+length(Txt), [T1, T | Acc])
+            Ann1 = erl_anno:set_text([hd(Txt)], Ann),
+            T = {dot, Ann1},
+            Ann5 = erl_anno:set_text(tl(Txt), Ann),
+            L = erl_anno:line(Ann5),
+            C = erl_anno:column(Ann5),
+            Ann6 = erl_anno:set_location({L,C+1}, Ann5),
+            T1 = {white_space, Ann6},
+            convert_tokens(Rest, [convert_token(T1), convert_token(T) | TokensAcc])
     end;
-convert_tokens([{What, [{text,Txt}, {location, {L, _O}}], _} | Rest], Ofs, Acc) when What==white_space; What==comment ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=unicode:characters_to_binary(Txt)},
-    convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
-convert_tokens([{What, [{text,Txt}, {location, {L, _O}}], Sym} | Rest], Ofs, Acc) ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt, value=Sym},
-    convert_tokens(Rest, Ofs+length(Txt), [T | Acc]);
-convert_tokens([{What, [{text,Txt}, {location, {L, _O}}]} | Rest], Ofs, Acc) ->
-    T = #token{kind=What, line=L, offset=Ofs, length=length(Txt), text=Txt},
-    convert_tokens(Rest, Ofs+length(Txt), [T | Acc]).
+convert_tokens([T | Rest], TokensAcc) ->
+    convert_tokens(Rest, [convert_token(T) | TokensAcc]).
 
-make_macro(L, O, G, Txt) ->
+make_macro(Anno, Txt) ->
     V = list_to_atom(Txt),
-    #token{kind=macro, line=L, offset=O, length=G, text=Txt, value=V}.
+    Anno1 = erl_anno:set_text(Txt, Anno),
+    {macro, Anno1, V}.
 
+convert_token({K, A}) ->
+    {K, erl_anno:location(A), erl_anno:text(A), undefined};
+convert_token({K, A, V}) ->
+    {K, erl_anno:location(A), erl_anno:text(A), V}.
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+create_line_info_test_() ->
+    [
+        ?_assertEqual({[{0, 0, 3, ""}], {0, 3}}, create_line_info("hej", {0, 0})),
+        ?_assertEqual({[{2, 5, 5, "  "}], {2, 10}}, create_line_info("  hej", {2, 5})),
+        ?_assertEqual({[{2, 5, 6, " \t "}], {2, 11}}, create_line_info(" \t hej", {2, 5}))
+    ].
+
+-endif.

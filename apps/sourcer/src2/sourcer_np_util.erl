@@ -4,11 +4,11 @@
 
 %% -define(DEBUG, 1).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 -include("sourcer_noparse.hrl").
 -include("sourcer_token.hrl").
 
--export([extract_comments/1, split_after_dots/1, skip_to/2,
+-export([extract_comments/1, skip_to/2,
          get_between_outer_pars/3, compact_model/1, get_top_level_comments/2]).
 
 %% @doc extract comments from tokens, and concatenate multiline comments to one token
@@ -30,23 +30,6 @@ extract_comments([C = #token{kind=comment, line=N} | Rest], _, TAcc, CAcc) ->
     extract_comments(Rest, N+1, TAcc, [C | CAcc]);
 extract_comments([T | Rest], _, TAcc, CAcc) ->
     extract_comments(Rest, -1, [T | TAcc], CAcc).
-
-%% @doc split tokens list at 'dot' tokens
--spec split_after_dots([token()]) -> [[token()]].
-%%
-split_after_dots(D) ->
-    split_after_dots(D, [], []).
-
-split_after_dots([], Acc, []) ->
-    sourcer_util:reverse2(Acc);
-split_after_dots([], Acc, FunAcc) ->
-    split_after_dots([], [FunAcc | Acc], []);
-split_after_dots([#token{kind = eof} | _], Acc, FunAcc) ->
-    split_after_dots([], Acc, FunAcc);
-split_after_dots([T = #token{kind = dot} | TRest], Acc, FunAcc) ->
-    split_after_dots(TRest, [[T | FunAcc] | Acc], []);
-split_after_dots([T | TRest], Acc, FunAcc) ->
-    split_after_dots(TRest, Acc, [T | FunAcc]).
 
 %% @doc drop tokens until delimiter
 -spec skip_to([token()], atom()) -> [token()].

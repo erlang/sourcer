@@ -7,7 +7,7 @@
 
 %-define(DEBUG, 1). %
 
--include("dbglog.hrl").
+-include("debug.hrl").
 
 %%
 %% API Functions

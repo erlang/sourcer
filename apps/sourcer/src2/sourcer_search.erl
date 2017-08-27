@@ -5,7 +5,7 @@
 
 %% -define(DEBUG, 1).
 
--include("dbglog.hrl").
+-include("debug.hrl").
 -include("include/sourcer_search.hrl").
 
 -export([find_data/4]).

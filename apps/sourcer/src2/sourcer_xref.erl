@@ -19,7 +19,7 @@
 -define(XREF, sourcer_xref).
 
 
--include("dbglog.hrl").
+-include("debug.hrl").
 
 start() ->
     start(whereis(?XREF)).

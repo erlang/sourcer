@@ -1,16 +1,8 @@
-%% Author: jakob
-%% Created: 30 aug 2010
--module(sourcer_parsing_tests).
+-module(sourcer_parse_tests).
 
 -include_lib("eunit/include/eunit.hrl").
--include("sourcer_noparse.hrl").
--include("sourcer_token.hrl").
 
--export([test_parse/1]).
-
-%%
-%% API Functions
-%%
+-include("sourcer_parse.hrl").
 
 parse_directive_test_() ->
     [?_assertEqual({[#attribute{pos = {{0,0,0},51},
@@ -37,7 +29,6 @@ parse_small_functions_test_() ->
                    test_parse("f() ->\n    a."))].
 
 parsing_define_with_record_ref_test_() ->
-    %% http://www.assembla.com/spaces/sourcer/tickets/602-parser-can-t-handle-record-definitions-in-defines
     [?_assertEqual({[#attribute{pos={{0,0,0},18},
                                 name=define,
                                 args=xx,

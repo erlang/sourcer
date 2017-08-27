@@ -15,15 +15,15 @@ quz(_) ->
 
 split_test_() ->
     [
-        ?_assertEqual([""], sourcer_util:split("", "d")),
-        ?_assertEqual(["abc"], sourcer_util:split("abc", "d")),
-        ?_assertEqual(["abd"], sourcer_util:split("abd", "d")),
-        ?_assertEqual(["d","ad","a"], sourcer_util:split("dada", "d")),
-        ?_assertEqual(["ad","cd"], sourcer_util:split("adcd", "d")),
-        ?_assertEqual(["ad","d","e"], sourcer_util:split("adde", "d"))
+        ?_assertEqual([""], sourcer_parse_util:split("", "d")),
+        ?_assertEqual(["abc"], sourcer_parse_util:split("abc", "d")),
+        ?_assertEqual(["abd"], sourcer_parse_util:split("abd", "d")),
+        ?_assertEqual(["d","ad","a"], sourcer_parse_util:split("dada", "d")),
+        ?_assertEqual(["ad","cd"], sourcer_parse_util:split("adcd", "d")),
+        ?_assertEqual(["ad","d","e"], sourcer_parse_util:split("adde", "d"))
     ].
 
-parse_file_test_() ->
+parse_file_test_1() ->
     Text = text(),
     {ok, AST, Refs, Lines} = sourcer_documents:parse_file("foo1", Text),
     Chunks = chunk(Text, Lines, []),

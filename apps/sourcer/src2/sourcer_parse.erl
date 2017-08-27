@@ -2,7 +2,7 @@
 %% Author: jakob
 %% Created: Mar 23, 2006
 
--module(sourcer_noparse).
+-module(sourcer_parse).
 
 %% called from Java
 -export([initial_parse/5, reparse/2]).
@@ -11,12 +11,12 @@
 -export([get_module_refs/4]).
 
 %-define(DEBUG, 1).
--define(IO_FORMAT_DEBUG, 1).
+
 
 -define(SERVER, sourcer_noparse).
 
--include("dbglog.hrl").
--include("sourcer_noparse.hrl").
+-include("debug.hrl").
+-include("sourcer_parse.hrl").
 -include("sourcer_scanner_server.hrl").
 -include("sourcer_search.hrl").
 
