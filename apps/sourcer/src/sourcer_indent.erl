@@ -36,8 +36,11 @@ default_indent_prefs() ->
      {'fun', 3},
      {fun_body, 5},
      {paren, 1},
+     {delimiter, -1},
      {'<<', 2},
-     {end_paren, 0},
+     {end_paren, -1},
+     {end_block, 0},
+     {record_def, 3},
      {comment_3, 0},
      {comment_2, 0},
      {comment_1, 48},
@@ -91,7 +94,6 @@ do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
     end.
 
 %% TODO: value 4 is hardcoded! Should use indentation width here
-
 indent(LineN, Tokens, Prefs) ->
     A0 = {start,{-1,1},"",undefined},
     I = #i{anchor=A0, indent_line=LineN, current=0, prefs=Prefs,
@@ -231,9 +233,7 @@ i_with_old_or_new_anchor(AOld, _ANew, I) ->
 i_par_list(R0, I0) ->
     I1 = I0#i{in_block=false},
     R1 = i_kind('(', R0, I1),
-    I2 = i_with(end_paren, R0, I1),
-    R2 = i_parameters(R1, I1),
-    i_end_paren(R2, I2).
+    i_end_paren_or_expr_list(R1,I1).
 
 i_expr([], _I, _A) ->
     {[], eof};
@@ -297,6 +297,8 @@ i_expr_rest(R0, I, A) ->
             R1 = i_binary_op(R0, i_with(before_binary_op, I)),
             {R2, _A} = i_expr(R1, i_with(after_binary_op, I), none),
             {R2, A};
+        '|' -> %% List
+            {R0, A};
         _ ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
@@ -311,7 +313,8 @@ i_expr_rest(R0, I, A) ->
     end.
 
 i_expr_list(R, I) ->
-    i_expr_list(R, I, none).
+    {Rest, _} = i_expr_list(R, I, none),
+    Rest.
 
 i_expr_list(R0, I0, A0) ->
     R1 = i_comments(R0, I0),
@@ -321,10 +324,15 @@ i_expr_list(R0, I0, A0) ->
     I1 = i_with_old_or_new_anchor(A0, A1, I0),
     case i_sniff(R2) of
         ',' ->
-            R3 = i_kind(',', R2, I1),
+            I2 = i_with('delimiter', I1),
+            R3 = i_kind(',', R2, I2),
+            i_expr_list(R3, I1, I1#i.anchor);
+        '|' ->
+            I2 = i_with('delimiter', I1),
+            R3 = i_kind('|', R2, I2),
             i_expr_list(R3, I1, I1#i.anchor);
         _ ->
-            R2
+            {R2, A1}
     end.
 
 i_binary_expr_list(R, I) ->
@@ -416,15 +424,11 @@ i_predicate_list(R0, I0, A0) ->
 i_binary_op(R0, I) ->
     i_one(R0, I).
 
-i_end_paren_or_expr_list(R, I0) ->
-    i_check(R, I0),
-    case i_sniff(R) of
-        Kind when Kind=='}'; Kind==']'; Kind==')' ->
-            R;
-        _ ->
-            I1 = i_with(none, R, I0),
-            i_expr_list(R, I1)
-    end.
+i_end_paren_or_expr_list(R0, I0) ->
+    i_check(R0, I0),
+    {R1, A0} = i_expr_list(R0, I0#i{in_block=false}, none),
+    I2 = i_with(end_paren, A0, I0),
+    i_end_paren(R1, I2).
 
 i_end_or_expr_list(R, I0) ->
     i_check(R, I0),
@@ -455,9 +459,7 @@ i_1_expr([?k(char) | _] = R, I) ->
 i_1_expr([?k(Kind) | _] = R0, I0) when Kind=='{'; Kind=='['; Kind=='(' ->
     R1 = i_kind(Kind, R0, I0),
     I1 = i_with(paren, R0, I0),
-    R2 = i_end_paren_or_expr_list(R1, I1#i{in_block=false}),
-    I2 = i_with(end_paren, R0, I0),
-    i_end_paren(R2, I2);
+    i_end_paren_or_expr_list(R1, I1#i{in_block=false});
 i_1_expr([?k('<<') | _] = R0, I0) ->
     R1 = i_kind('<<', R0, I0),
     I1 = i_with('<<', R0, I0),
@@ -629,7 +631,7 @@ is_unary_op(?k(Op)) ->
     lists:member(Op, ['not', '-', '?', 'catch']).
 
 i_block_end(_Begin, R0, R1, I0) ->
-    I1 = i_with(end_paren, R0, I0),
+    I1 = i_with(end_block, R0, I0),
     i_kind('end', R1, I1).
 
 i_one(R0, I) ->
@@ -670,7 +672,9 @@ i_record([?k('#') | R0], I0) ->
             ?D(R4),
             {R4, I#i.anchor};
         '{' ->
-            i_expr(R2, I, I#i.anchor);
+            R3 = i_kind('{', R2, I),
+            I1 = i_with(record_def, I),
+            {i_end_paren_or_expr_list(R3, I1), hd(R1)};
         '[' ->
             i_expr(R2, I, none);
         '?' ->
