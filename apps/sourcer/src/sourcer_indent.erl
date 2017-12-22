@@ -33,8 +33,10 @@ default_indent_prefs() ->
      {'catch', 4},
      {'after', 4},
      {function_parameters, 2},
+     {'when', 6},
+     {'after_when', 10},
      {'fun', 3},
-     {fun_body, 5},
+     {fun_body, 8},
      {paren, 1},
      {delimiter, -1},
      {'<<', 2},
@@ -115,7 +117,9 @@ indent(LineN, Tokens, Prefs) ->
             {N, Inblock};
         error:_E ->
             ?D(_E),
-            io:format("~p:~p: ~P ~p~n",[?MODULE, ?LINE, _E, 20, erlang:get_stacktrace()]),
+            io:format("~p:~p: Error: ~P~n  ~P~n",
+                      [?MODULE, ?LINE, _E, 20, erlang:get_stacktrace(), 20]),
+            error(parse_error),
             {0, true}
     end.
 
@@ -492,12 +496,12 @@ i_1_expr([?k('fun')=T | R0], I) ->
     case i_sniff(R0) of
         '(' ->
             R1 = i_fun_clause_list(R0, I1),
-            i_kind('end', R1, I);
+            i_kind('end', R1, i_with(none, I1));
         var ->
             case i_sniff(tl(R0)) of
                 '(' ->
-                    R1 = i_fun_clause_list(R0, I1#i{current=I1#i.current+1}),
-                    i_kind('end', R1, I);
+                    R1 = i_fun_clause_list(tl(R0), I1#i{current=I1#i.current+1}),
+                    i_kind('end', R1, i_with(none,I1));
                 _ ->
                     {R1, _A} = i_expr(R0, I1, none),
                     R1
@@ -526,9 +530,9 @@ i_macro(R0, I) ->
 i_macro_rest(R0, I) ->
     case i_sniff(R0) of
         Paren when Paren=:='('; Paren=:='{'; Paren=:='[' ->
-            R1 = i_kind(Paren, R0, I),
-            R2 = i_parameters(R1, I),
-            R3 = i_end_paren(R2, I),
+            I1 = i_with(function_parameters, I#i.anchor, I),
+            R1 = i_kind(Paren, R0, I1),
+            R3 = i_end_paren_or_expr_list(R1, I1),
             i_macro_rest(R3, I);
         K when K=:=':'; K=:=','; K=:=';'; K=:=')'; K=:='}'; K=:=']'; K=:='>>'; K=:='of';
                K=:='end'; K=:='->'; K =:= '||' ->
@@ -644,15 +648,6 @@ i_one(R0, I) ->
 i_two(R0, I) ->
     R1 = i_one(R0, I),
     i_one(R1, I).
-
-i_parameters(R, I) ->
-    i_check(R, I),
-    case i_sniff(R) of
-        ')' ->
-            R;
-        _ ->
-            i_expr_list(R, I#i{in_block=false})
-    end.
 
 i_record([?k('#') | R0], I0) ->
     I = I0#i{in_block=false},
@@ -828,18 +823,20 @@ i_spec(R0, I) ->
 
 i_fun_clause(R0, I0) ->
     R1 = i_comments(R0, I0),
-    {R2, A} = i_expr(R0, I0, none),
+    {R2, A} = i_expr(R1, I0, none),
     I1 = i_with(before_arrow, A, I0#i{in_block=false}),
     R3 = case i_sniff(R2) of
              'when' ->
-                 R21 = i_kind('when', R2, I1),
-                 {R22, _A} = i_predicate_list(R21, I1),
+                 I11 = i_with('when', I0),
+                 R21 = i_kind('when', R2, I11),
+                 I12 = i_with('after_when', I11),
+                 {R22, _A} = i_predicate_list(R21, I12),
                  R22;
              _ ->
                  R2
          end,
     R4 = i_kind('->', R3, I1),
-    I2 = i_with(fun_body, R1, I0),
+    I2 = i_with(fun_body, I0),
     i_expr_list(R4, I2#i{in_block=true}).
 
 i_fun_clause_list(R, I) ->
@@ -860,18 +857,19 @@ i_after_clause(R0, I0) ->
 i_clause(R0, I) ->
     {R1, A} = i_expr(R0, I, none),
     I1 = i_with(before_arrow, A, I),
-    R2 = case i_sniff(R1) of
-             'when' ->
-                 R11 = i_kind('when', R1, I1),
-                 {R12, _A} = i_predicate_list(R11, I1),
-                 R12;
-             _ ->
-                 R1
-         end,
-    I2 = I1#i{in_block=true},
-    R3 = i_kind('->', R2, I2),
-    I3 = i_with(after_arrow, I2),
-    R = i_expr_list(R3, I3),
+    {R4,I3} = case i_sniff(R1) of
+                  'when' ->
+                      R2 = i_kind('when', R1, I1),
+                      I2 = i_with('when', I1),
+                      {R3, _A} = i_predicate_list(R2, I2),
+                      {R3, I2};
+                  _ ->
+                      {R1, I1}
+              end,
+    I4 = I3#i{in_block=true},
+    R5 = i_kind('->', R4, I4),
+    I5 = i_with(after_arrow, I4),
+    R = i_expr_list(R5, I5),
     ?D(R),
     R.
 
