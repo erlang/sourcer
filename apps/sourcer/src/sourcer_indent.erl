@@ -39,6 +39,7 @@ default_indent_prefs() ->
      {delimiter, -1},
      {'<<', 2},
      {end_paren, -1},
+     {end_paren2, -2},
      {end_block, 0},
      {record_def, 3},
      {comment_3, 0},
@@ -343,11 +344,15 @@ i_binary_expr_list(R0, I0, A0) ->
     ?D(R1),
     case i_sniff(R1) of
         '>>' ->
-            R1;
+            I1 = i_with(end_paren2, A0, I0),
+            i_kind('>>', R1, I1);
         _ ->
             {R2, A1} = i_binary_expr(R1, I0),
             I1 = i_with_old_or_new_anchor(A0, A1, I0),
             case i_sniff(R2) of
+                '>>' ->
+                    I2 = i_with(end_paren2, A0, I1),
+                    i_kind('>>', R2, I2);
                 ',' ->
                     R3 = i_kind(',', R2, I1),
                     i_binary_expr_list(R3, I1, I1#i.anchor);
@@ -402,8 +407,7 @@ i_binary_specifier(R0, I) ->
             R1;
         Kind when Kind==var; Kind==string; Kind==integer; Kind==atom; Kind==char ->
             R1 = i_comments(R0, I),
-            R2 = i_kind(Kind, R1, I),
-            i_1_expr(R2, I)
+            i_kind(Kind, R1, I)
     end.
 
 i_predicate_list(R, I) ->
@@ -463,9 +467,7 @@ i_1_expr([?k(Kind) | _] = R0, I0) when Kind=='{'; Kind=='['; Kind=='(' ->
 i_1_expr([?k('<<') | _] = R0, I0) ->
     R1 = i_kind('<<', R0, I0),
     I1 = i_with('<<', R0, I0),
-    R2 = i_binary_expr_list(R1, I1#i{in_block=false}),
-    I2 = i_with(end_paren, R0, I0),
-    i_kind('>>', R2, I2);
+    i_binary_expr_list(R1, I1#i{in_block=false});
 i_1_expr([?k('#') | _] = L, I) ->
     ?D('#'),
     {R, _A} = i_record(L, I#i{in_block=false}),
@@ -736,7 +738,7 @@ i_end_paren(R0, I) ->
     R1 = i_comments(R0, I),
     i_end_paren_1(R1, I).
 
-i_end_paren_1([?k(Kind) | _] = R, I) when Kind==')'; Kind=='}'; Kind==']'; Kind=='>>'; Kind==eof ->
+i_end_paren_1([?k(Kind) | _] = R, I) when Kind==')'; Kind=='}'; Kind==']'; Kind==eof ->
     i_kind(Kind, R, I).
 
 i_form_list(R0, I) ->
