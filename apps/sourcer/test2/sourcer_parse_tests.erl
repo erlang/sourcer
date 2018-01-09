@@ -36,7 +36,7 @@ parsing_define_with_record_ref_test_() ->
                     []},
                    test_parse("-define(xx, #x{})."))].
 
-parsing_record_def_test_() ->
+parsing_parse_record_test_() ->
     Expected = {[#attribute{pos = {{0, 0, 0}, 32},
                             name = record,
                             args = {a, [{b, {{0, 0, 12}, 1}, ""},
@@ -46,7 +46,7 @@ parsing_record_def_test_() ->
     Value = test_parse("-record(a, {b, c :: integer()})."),
     [?_assertEqual(Expected, Value)].
 
-parsing_record_def1_test_() ->
+parsing_parse_record1_test_() ->
     Expected = {[#attribute{pos = {{0, 0, 0}, 49},
                             name = record,
                             args = {a, [{b, {{0, 0, 12}, 1}, ""},

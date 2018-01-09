@@ -1,5 +1,5 @@
 %%% @author vlad
-%%% @doc Handle LSP messages by dispatching (asynchronously) 
+%%% @doc Handle LSP messages by dispatching (asynchronously)
 %%% to a provided handler module.
 
 -module(lsp_server).
@@ -20,15 +20,15 @@ start_link(Mod) ->
 %%%%%%%%%%%%%%%%%%%%%
 
 -record(state, {
-				stopped = false,
+				stopped = true,
 				pending_requests = [],
-				user_module = sourcer, 
-				user_state 
-				%% TODO: user_state can be big, do we want to keep send it back and forth 
-				%% for each request?? If we want async workers, it can't be completely 
+				user_module = sourcer,
+				user_state
+				%% TODO: user_state can be big, do we want to keep send it back and forth
+				%% for each request?? If we want async workers, it can't be completely
 				%% avoided, I think
-				%% -->> workers should get only parts of the state that are relevant for 
-				%% the operation, for example only the current document data 
+				%% -->> workers should get only parts of the state that are relevant for
+				%% the operation, for example only the current document data
 				%% (unless it's a worskpace operation)
 			   }).
 
@@ -46,63 +46,54 @@ init([Mod]) ->
 		},
 	{ok, State}.
 
-handle_call({'initialize', Id, Params}, 
+handle_call({'initialize', Id, Params},
 		_From, State=#state{user_module = Mod}) ->
 	?DEBUG("REQ ~p: ~p:: ~p~n", [Id, 'initialize', Params]),
 	{Reply, NewUserState} = Mod:initialize(Params),
 	reply(Id, Reply),
-	{reply, error, State#state{user_state=NewUserState}};
-handle_call({Method, Id, Params}, 
-		_From, State=#state{user_module = Mod, pending_requests=Reqs, stopped=Stopped}) ->
+	{reply, error, State#state{user_state=NewUserState, stopped=false}};
+handle_call({Method, Id, Params},
+		_From, State=#state{user_module = Mod, stopped=true}) ->
+	reply(Id, Mod:error(server_not_initialized, "Server was stopped")),
+	{reply, error, State};
+handle_call({Method, Id, Params},
+		_From, State=#state{user_module = Mod, pending_requests=Reqs}) ->
 	?DEBUG("REQ ~p: ~p:: ~p~n", [Id, Method, Params]),
-	case Stopped of	
-		false ->
-			Pid = start_worker(Id, Method, Params, State),
-			NewReqs = [{Id, Pid}|Reqs],
-			{noreply, State#state{pending_requests=NewReqs}};
-		true ->
-			reply(Id, Mod:error(server_not_initialized, "Server was stopped")),
-			{reply, error, State}
-	end;
+	Pid = start_worker(Id, Method, Params, State),
+	NewReqs = [{Id, Pid}|Reqs],
+	{noreply, State#state{pending_requests=NewReqs}};
 handle_call(Request, _From, State) ->
 	?DEBUG("Unrecognized request: ~p~n", [Request]),
 	Reply = {error, {unknown, Request}},
 	{reply, Reply, State}.
 
 handle_cast({'exit', _}, State) ->
-	?DEBUG("NOT: ~p::~n", ['exit']),
+	?DEBUG("NTF: ~p::~n", ['exit']),
 	{stop, State};
+handle_cast({Method, Params}, State=#state{stopped=true}) ->
+	?DEBUG("NTF: ignored ~p:: ~p~n", [Method, Params]),
+	{noreply, State};
 handle_cast({'$/cancelRequest', #{id := Id}}, State) ->
-	?DEBUG("NOT: ~p:: ~p~n", ['$/cancelRequest', Id]),
+	?DEBUG("NTF: ~p:: ~p~n", ['$/cancelRequest', Id]),
 	NewState = cancel_worker(Id, State),
 	{noreply, NewState};
-handle_cast({Method, Params}, State=#state{user_module=Mod, stopped=Stopped}) ->
-	?DEBUG("NOT: ~p:: ~p~n", [Method, Params]),
-	case Stopped of	
-		false ->
-			%% run in-process to keep the ordering of received messages
-			Exps = Mod:module_info(exports),
-			NewState = case lists:member({Method, 2}, Exps) of
-				true ->
-					try
-						Mod:Method(State#state.user_state, Params)
-					catch _:E ->
-						?DEBUG("####################~nERROR: ~p ~p~n", [E, erlang:get_stacktrace()]),
-						ok
-					end;
-				false ->
-					io:format("Unsupported notification: ~p~n", [Method]),
-					State#state.user_state
-			end,
-			{noreply, State#state{user_state=NewState}};
+handle_cast({Method, Params}, State=#state{user_module=Mod}) ->
+	?DEBUG("NTF: ~p:: ~p~n", [Method, Params]),
+	%% run in-process to keep the ordering of received messages
+	Exps = Mod:module_info(exports),
+	NewState = case lists:member({Method, 2}, Exps) of
 		true ->
-			case Method of
-				'shutdown' ->
-					{noreply, State#state{stopped = true}};
-				_ ->
-					{noreply, State}
-			end
-	end;
+			try
+				Mod:Method(State#state.user_state, Params)
+			catch _:E ->
+				?DEBUG("####################~nERROR: ~p (~p:~p ~p) ~n-- ~p~n", [E, Mod, Method, Params, erlang:get_stacktrace()]),
+				State#state.user_state
+			end;
+		false ->
+			io:format("Unsupported notification: ~p~n", [Method]),
+			State#state.user_state
+	end,
+	{noreply, State#state{user_state=NewState}};
 handle_cast(Other, State) ->
 	io:format("Unrecognized notification: ~p~n", [Other]),
 	{noreply, State}.
@@ -138,10 +129,10 @@ start_worker(Id, Method, Params, State) ->
 				Exps = Mod:module_info(exports),
 				case lists:member({Method, 3}, Exps) of
 					true ->
-						try 
+						try
 							sourcer:Method(UserState, Params, Reporter)
 						catch _:E ->
-							?DEBUG("####################~nERROR: ~p ~p~n", [E, erlang:get_stacktrace()]),
+							?DEBUG("####################~nERROR: ~p ~n", [E]),
 							Mod:default_answer(Method)
 						end;
 					false ->

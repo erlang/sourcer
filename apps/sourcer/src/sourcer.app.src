@@ -3,7 +3,7 @@
     {vsn, "0.2.0"}
   , {erlide_context, ide}
   , {registered,   []}
-  , {applications, [kernel, stdlib]}
+  , {applications, [kernel, stdlib, syntax_tools]}
   , {env,          []}
   , {contributors, ["Vlad Dumitrescu"]}
   , {licenses, ["Apache 2.0"]}

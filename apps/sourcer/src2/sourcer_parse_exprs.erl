@@ -7,7 +7,7 @@ consult(B) when is_binary(B) ->
     consult(unicode:characters_to_list(B));
 consult(L) when is_list(L) ->
     {ok, Toks, _} = erl_scan:string(L),
-    {FormToks, _} = sourcer_parse_util:split_at_dot(Toks),
+    {FormToks, _} = ?util:split_at_dot(Toks),
     lists:map(fun parse1/1, FormToks).
 
 parse1(Toks) ->

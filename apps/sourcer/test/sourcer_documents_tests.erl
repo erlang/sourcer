@@ -13,21 +13,11 @@ quz(_) ->
     ok.
     ".
 
-split_test_() ->
-    [
-        ?_assertEqual([""], sourcer_parse_util:split("", "d")),
-        ?_assertEqual(["abc"], sourcer_parse_util:split("abc", "d")),
-        ?_assertEqual(["abd"], sourcer_parse_util:split("abd", "d")),
-        ?_assertEqual(["d","ad","a"], sourcer_parse_util:split("dada", "d")),
-        ?_assertEqual(["ad","cd"], sourcer_parse_util:split("adcd", "d")),
-        ?_assertEqual(["ad","d","e"], sourcer_parse_util:split("adde", "d"))
-    ].
-
 parse_file_test_1() ->
     Text = text(),
     {ok, AST, Refs, Lines} = sourcer_documents:parse_file("foo1", Text),
     Chunks = chunk(Text, Lines, []),
-    TextLines = sourcer_util:split(Text, "\n"),
+    TextLines = sourcer_scan_util:split(Text),
     [
         ?_assertMatch([
                         {attribute,

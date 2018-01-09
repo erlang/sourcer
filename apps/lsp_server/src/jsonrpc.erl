@@ -8,6 +8,7 @@
 		start_link/4,
 		send_notification/2,
 		send_request/3,
+		send_request/2,
 		send_reply/2
 	]).
 
@@ -41,6 +42,9 @@ send_notification(Method, Params) ->
 send_request(Id, Method, Params) ->
 	?MODULE ! {request, Id, Method, Params}.
 
+send_request(Id, Method) ->
+	?MODULE ! {request, Id, Method}.
+
 send_reply(Id, Answer) ->
 	?MODULE ! {reply, Id, Answer}.
 
@@ -65,6 +69,9 @@ loop(Socket, Server, Client, Options, Buf, Pending, Results) ->
 			loop(Socket, Server, Client, Options, Buf, Pending, Results);
 		{request, Id, Method, Params} ->
 			request(Socket, Id, Method, Params),
+			loop(Socket, Server, Client, Options, Buf, Pending, Results);
+		{request, Id, Method} ->
+			request(Socket, Id, Method),
 			loop(Socket, Server, Client, Options, Buf, Pending, Results);
 		{reply, Id, Answer} ->
 			Results1 = [{Id, Answer} | Results],
@@ -136,15 +143,15 @@ dispatch(#{jsonrpc := <<"2.0">>,
 				    id := Id,
 				    result := Result
 				}, _Server, Client) ->
-	?DEBUG("<# RECV: RESULT ~p: ~tp~n", [Id, Result]),
-	gen_server:cast(Client, {'$reply', Id, Result});
+	?DEBUG("<# RECV: REPLY ~p: ~tp~n", [Id, Result]),
+	Client ! {'$reply', Id, Result};
 dispatch(#{jsonrpc := <<"2.0">>,
 				    id := Id,
 				    error := Error
 				}, _Server, Client) ->
 	ErrCode = error_code_dec(Error),
-	?DEBUG("<# RECV: RESULT ~p: ~tp~n", [Id, ErrCode]),
-	gen_server:cast(Client, {'$reply', Id, ErrCode});
+	?DEBUG("<# RECV: REPLY ~p: ~tp~n", [Id, ErrCode]),
+	Client ! {'$reply', Id, ErrCode};
 dispatch(#{jsonrpc := <<"2.0">>,
 				    id := Id,
 				    method := Method0,
@@ -166,12 +173,7 @@ dispatch(#{jsonrpc := <<"2.0">>,
 				}, Server, Client) ->
 	Method = binary_to_atom(Method0, unicode),
 	?DEBUG("<# RECV: NOTIFICATION ~tp ~tp~n", [Method, Params]),
-	case Method of
-		'initialized' ->
-			gen_server:cast(Client, {Method, Params});
-		_ ->
-			gen_server:cast(Server, {Method, Params})
-	end;
+	gen_server:cast(Server, {Method, Params});
 dispatch(#{jsonrpc := <<"2.0">>,
 				    method := Method0
 				}, Server, _Client) ->
@@ -196,13 +198,14 @@ request(Socket, Id, Method, Params) ->
 		},
 	send_tcp(Socket, Ans).
 
-reply(Socket, Id, Msg) when is_map(Msg); is_list(Msg); Msg==null ->
-	?DEBUG("#> SEND: REPLY ~p: ~tp~n", [Id, Msg]),
+request(Socket, Id, Method) ->
+	?DEBUG("#> SEND: REQUEST ~p: ~tp ~n", [Id, Method]),
 	Ans = #{jsonrpc => <<"2.0">>,
 			id => Id,
-			result => Msg
+			method => Method
 		},
-	send_tcp(Socket, Ans);
+	send_tcp(Socket, Ans).
+
 reply(Socket, Id, {error, Code0, Msg})  ->
 	Code = error_code_enc(Code0),
 	?DEBUG("#> SEND: REPLY ~p: ~tp~n", [Id, Msg]),
@@ -214,8 +217,15 @@ reply(Socket, Id, {error, Code0, Msg})  ->
 					}
 		},
 	send_tcp(Socket, Ans);
+reply(Socket, Id, Msg) when is_map(Msg); is_list(Msg); Msg==null ->
+	?DEBUG("#> SEND: REPLY ~p: ~tp~n", [Id, Msg]),
+	Ans = #{jsonrpc => <<"2.0">>,
+			id => Id,
+			result => Msg
+		},
+	send_tcp(Socket, Ans);
 reply(_Socket, Id, Msg) ->
-	?TRACE("Erroneous message ~tp~n",[{Id, Msg, erlang:get_stacktrace()}]),
+	?TRACE("Erroneous reply: ~tp~n",[{Id, Msg}]),
 	ok.
 
 send_replies(Socket, Pending, Options, Results) -> 

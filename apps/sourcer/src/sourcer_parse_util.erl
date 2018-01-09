@@ -1,36 +1,28 @@
 -module(sourcer_parse_util).
 
 -export([
-    split/2,
     get_line_text/2, 
     get_line_text/3,
 
-    compact_newlines/1,
-    group_comments/1,
-    comment_level/1,
-    skip_percent/1,
+    extract_top_comments/1,
 
-    split_at_semicolon_paren/1,
-    split_at_semicolon_name/1,
+    take_until_token/2,
+    take_until_token/3,
     split_at_token/2,
-    middle/1
+    split_at_token/3,
+    take_until_matching_token/2,
+
+    middle/1,
+
+    take_block_list/1
 ]).
 
+-define(DEBUG, true).
 -include("debug.hrl").
 
-%% a string split that keeps the separators at the end of the parts
-split(String, Sep) ->
-	split(String, Sep, []).
-
-split(String, Sep, R) ->
-	case string:split(String, Sep) of	
-		[H] ->
-			lists:reverse([H|R]);
-		[H, []] ->
-			lists:reverse([H++Sep|R]);
-		[H, T] ->
-			split(T, Sep, [H++Sep|R])
-	end.
+-define(k(X), {X,_,_,_}).
+-define(LPAR, '(').
+-define(RPAR, ')').
 
 get_line_text(String, {_, Ofs, Len, _}) ->
     string:substr(String, Ofs+1, Len).
@@ -39,109 +31,160 @@ get_line_text(String, Index, LineInfo) ->
     I = lists:keyfind(Index, 1, LineInfo),
     get_line_text(String, I).
 
-compact_newlines(L) ->
-compact_newlines(L, []).
+extract_top_comments(Toks) ->
+    Toks1 = remove_inline_whitespace(Toks), 
+    % keep comments and whitespace at beginning
+    SplitFun = fun(?k(white_space))->true; 
+                    (?k(comment))->true; 
+                    (_)->false 
+                end,
+    {Toks2, Rest} = lists:splitwith(SplitFun, Toks1),
+    % remove last lines of whitespace
+    DropFun = fun(?k(white_space))->true; 
+                 (_)->false         
+              end,
+    Toks3 = lists:reverse(lists:dropwhile(DropFun, lists:reverse(Toks2))),
+    {skip_unrelated_comments(Toks3, []), Rest}.
 
-compact_newlines([{white_space,_,_,_}=C,{white_space,_,_,_}|Rest], Acc) ->
-    compact_newlines(Rest, [C|Acc]);
-compact_newlines([{white_space,_,_,_}|Rest], Acc) ->
-    compact_newlines(Rest, Acc);
-compact_newlines([T|Rest], Acc) ->
-    compact_newlines(Rest, [T|Acc]);
-compact_newlines([], Acc) ->
-    lists:reverse(Acc).
+remove_inline_whitespace(L) ->
+    Fun = fun({white_space,_,_,V}) -> V=="\n"; (_)-> true end,
+    lists:filter(Fun, L).
 
-%% Split token list at "; Name (", where Name is the same
-%% as the first token which must be an atom.
-%% Semicolon is not included in result.
-split_at_semicolon_name([H|_]=L) ->
-    {atom, _, _, Name} = H,
-    split_at_semicolon_name(L , Name, [], []).
+%% only the last block of comments before the form is kept
+skip_unrelated_comments([], Acc) ->
+    compact_comments(lists:reverse(Acc));
+skip_unrelated_comments([?k(comment)=_C,{white_space, _, _, "\n"},{white_space, _, _, "\n"}|Toks], _Acc) ->
+    skip_unrelated_comments(Toks, []);
+skip_unrelated_comments([?k(comment)=C,{white_space, _, _, "\n"}|Toks], Acc) ->
+    skip_unrelated_comments(Toks, [C|Acc]);
+skip_unrelated_comments([?k(comment)=C|Toks], Acc) ->
+    skip_unrelated_comments(Toks, [C|Acc]);
+skip_unrelated_comments([?k(white_space)=_C|Toks], Acc) ->
+    skip_unrelated_comments(Toks, Acc).
 
-split_at_semicolon_name([], _, R, []) ->
-    lists:reverse(R);
-split_at_semicolon_name([], _, Acc, Crt) ->
-    lists:reverse(Acc, [lists:reverse(Crt)]);
-split_at_semicolon_name([{';', _, _, _}, {atom, _, _, Name}=H1, {'(', _, _, _}=H2|T],
-                        Name, Acc, Crt) ->
-    split_at_semicolon_name([H1, H2|T], Name, [lists:reverse(Crt)|Acc], []);
-split_at_semicolon_name([H|T], Name, Acc, Crt) ->
-    split_at_semicolon_name(T, Name, Acc, [H|Crt]).
+compact_comments([]) ->
+    [];
+compact_comments(L) ->
+    Fun = fun({comment, _, _, C}, Acc) -> [skip_percent(C)|Acc] end,
+    lists:reverse(lists:foldl(Fun, [], L)).
 
-%% Split token list at "; ("
-split_at_semicolon_paren(L) ->
-    split_at_semicolon_paren(L , [], []).
+%% split list at the first occurence of delimiter; 
+%% if delimiter not found, return whole list as result.
+take_until_token(L, Delim) ->
+    take_until_token(L, Delim, fun(_)-> true end).
 
-split_at_semicolon_paren([], R, []) ->
-    lists:reverse(R);
-split_at_semicolon_paren([], Acc, Crt) ->
-    lists:reverse(Acc, [lists:reverse(Crt)]);
-split_at_semicolon_paren([{';', _, _, _}, {'(', _, _, _}=H2|T], Acc, Crt) ->
-    split_at_semicolon_paren([H2|T], [lists:reverse(Crt)|Acc], []);
-split_at_semicolon_paren([H|T], Acc, Crt) ->
-    split_at_semicolon_paren(T, Acc, [H|Crt]).
+%% split list at the first occurence of delimiter and where 
+%% Pred(Rest) == true; if Pred is never true, return whole list as result;
+%% if encountering blocks, handle them properly.
+take_until_token(L, Delim, Pred) ->
+    take_until_token(L, Delim, Pred, []).
 
-split_at_token(L, Delim) ->
-    {X, Y} = lists:splitwith(fun({K,_,_,_}) -> K=/=Delim
-                            end, 
-                            L),
-    case Y of
-        [] ->
-            {X, Y};
+take_until_token([], _Delim, _Pred, R) ->
+    {lists:flatten(lists:reverse(R)), none, []};
+take_until_token([?k(Delim)=H|Rest], Delim, Pred, R) ->
+    case Pred(Rest) of
+        true ->
+            {lists:flatten(lists:reverse(R)), H, Rest};
+        false ->
+            take_until_token(Rest, Delim, Pred, [H|R])
+    end;    
+take_until_token([?k(K)=H|Rest], Delim, Pred, R) ->
+    case lists:keyfind(K, 1, get_block_tokens()) of
+        false ->
+            take_until_token(Rest, Delim, Pred, [H|R]);
         _ ->
-            {X, tl(Y)}
+            Rest2 = case {K, Rest} of
+                {'fun', [?k(?LPAR)=Hh|_]} ->
+                    % check if it is a defun or type
+                    {_, _, _, Bb} = take_until_matching_token(Hh, tl(Rest)),
+                    case Bb of
+                        [?k('->')|_] ->
+                            false;
+                        _ ->
+                            Bb
+                    end;
+                {'fun', [?k(_),?k(':')|_]} ->
+                    Rest;
+                {'fun', [?k(_),?k('/')|_]} ->
+                    Rest;
+                _ ->
+                    false
+            end,
+            case Rest2 of  
+                false ->
+                    {HH, LL, TT, RR} = take_until_matching_token(H, Rest),
+                    case TT of
+                        none ->
+                            take_until_token(RR, Delim, Pred, [LL|[HH|R]]);
+                        _ ->
+                            take_until_token(RR, Delim, Pred, [TT|[LL|[HH|R]]])
+                    end;
+                _ ->
+                    take_until_token(Rest, Delim, Pred, [H|R])
+            end
     end.
 
-%% split the list once at token kind; don't keep the delimiter
-split_at_token([], _, R) ->
-    {lists:reverse(R), []};
-split_at_token([{Delim, _, _, _}|Rest], Delim, R) ->
-    {lists:reverse(R), Rest};
-split_at_token([H|Rest], Delim, R) ->
-    split_at_token(Rest, Delim, [H|R]).
+%% surrounding tokens are included in result
+take_until_matching_token(?k(T1)=H, Rest) ->
+    case lists:keyfind(T1, 1, get_block_tokens()) of
+        false ->
+            %% should not happen
+            {error, bad_token, T1};
+        {T1, T2} ->
+            {A, D, B} = take_until_token(Rest, T2),
+            case D of
+                none ->
+                    {H, A, none, B};
+                _ ->
+                    {H, A, D, B}
+            end
+    end.
 
-% split the list at all Delims
-split_all_at_token(L, Delim) ->
-    %% TODO
-    [L].
+%% the pairs of tokens that build structured code
+get_block_tokens() ->
+    [
+        {'(', ')'},
+        {'[', ']'},
+        {'{', '}'},
+        {'<<', '>>'},
+        {'begin', 'end'},
+        {'if', 'end'},
+        {'case', 'end'},
+        {'receive', 'end'},
+        {'try', 'end'},
+        {'fun', 'end'}
+    ].
+
+%% split list at all delimiters; result does not include delimiters
+%% returns [{[token], delimiter token}]
+split_at_token(L, Delim) ->
+    split_at_token(L, Delim, fun(_)-> true end).
+
+split_at_token([], _Delim, _Pred) ->
+    [];
+split_at_token(L, Delim, Pred) ->
+    {H, D, T} = take_until_token(L, Delim, Pred),
+    DD = case D of
+        none ->
+            none;
+        _ ->
+            D
+    end,
+    [{H,DD}|split_at_token(T, Delim, Pred)].
 
 middle([]) ->
     [];
-middle([H|T]) ->
+middle([_]) ->
+    [];
+middle([_|T]) ->
     lists:reverse(tl(lists:reverse(T))).
-
-
-%% group comments with same level and no spaces inbetween
-group_comments(C) ->
-    case skip_white_at_start(C) of
-        [] ->
-            [];
-        [H|_]=C1 ->
-            Level = comment_level(H),
-            {G, Rest} = get_first_group(Level, C1, []),
-            [G] ++ group_comments(Rest)
-    end.
-
-get_first_group(_, [], Acc) ->
-    {lists:reverse(Acc), []};
-get_first_group(Level, [H|T]=L, Acc) ->
-    case comment_level(H) of
-        Level ->
-            get_first_group(Level, T, [H|Acc]);
-        _ ->
-            {lists:reverse(Acc), L}
-    end.
-
-skip_white_at_start(L) ->
-    lists:dropwhile(fun({white_space,_})->true; (_)->false end, L).
-
-comment_level({comment, _, "%%%%"++_, _}) -> 4;
-comment_level({comment, _, "%%%"++_, _}) -> 3;
-comment_level({comment, _, "%%"++_, _}) -> 2;
-comment_level({comment, _, "%"++_, _}) -> 1.
 
 skip_percent("%"++L) ->
     skip_percent(L);
 skip_percent(L) ->
     L.
 
+take_block_list(L) ->
+    {_, Args0, _, Rest} = take_until_matching_token(hd(L), tl(L)),
+    A = split_at_token(Args0, ','),
+    {[Ts||{Ts,_}<-A], Rest}.

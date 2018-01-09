@@ -10,14 +10,14 @@
 
 -define(ARI_TYPESPEC, -2).
 -define(ARI_ATTRIBUTE, -3).
--define(ARI_RECORD_DEF, -4).
+-define(ARI_parse_record, -4).
 -define(ARI_MACRO_DEF, -5).
 -define(ARI_INCLUDE, -6).
 -define(ARI_RECORD_FIELD_DEF, -7).
 
 record_ref_within_type_spec_test_() ->
     S = "-record(a, {b, c :: #rec{}}).",
-    Expected = [{"xxx", a, ?ARI_RECORD_DEF, [], false, 20, 4, false}],
+    Expected = [{"xxx", a, ?ARI_parse_record, [], false, 20, 4, false}],
     Value = test_refs(S, {record_ref, rec}),
     [?_assertEqual(Expected, Value)].
 

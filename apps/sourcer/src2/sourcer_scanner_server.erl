@@ -24,14 +24,10 @@ server_cmd(ScannerName, Command) ->
     server_cmd(ScannerName, Command, []).
 
 server_cmd(ScannerName, Command, Args) ->
-    try
-        ScannerName ! {Command, self(), Args},
-        receive
-            {Command, _Pid, Result} ->
-                Result
-        end
-    catch _:Exception ->
-              {error, Exception, erlang:get_stacktrace()}
+    ScannerName ! {Command, self(), Args},
+    receive
+        {Command, _Pid, Result} ->
+            Result
     end.
 
 spawn_server(ScannerName) ->
@@ -91,7 +87,7 @@ cmd(Cmd, From, Args, Module) ->
             reply(Cmd, From, {exit, Error}),
             Module;
         error:Error ->
-            reply(Cmd, From, {error, Error, erlang:get_stacktrace()}),
+            reply(Cmd, From, {error, Error}),
             Module
     end.
 

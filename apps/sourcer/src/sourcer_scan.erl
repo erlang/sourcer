@@ -7,18 +7,18 @@
          string/1,
          string/2,
          string/3,
-         reserved_word/1,
          filter_ws_tokens/1,
          filter_comment_tokens/1,
          filter_ws_comment_tokens/1,
-         filter_tokens/2]).
+         filter_tokens/2,
+         to_string/1]).
 
 -export([convert_token/1]).
 
 -type token() ::  {
-        Kind :: atom(), 
-        Location :: {integer(), integer()}, 
-        Text :: string(), 
+        Kind :: atom(),
+        Location :: {integer(), integer()},
+        Text :: string(),
         Value :: term()
     }.
 
@@ -71,6 +71,7 @@ string(String, {L, C}, Opts) ->
         {error, {_, _, {_, Quote, _}}, _} ->
             case string2(String++[Quote], {L, C}, Opts) of
                 {ok, _, _}=R1 ->
+                    %% TODO should remove the syntetic quote from last token's text
                     R1;
                 Err ->
                     Err
@@ -88,11 +89,7 @@ string2(String, {L, C}, Opts) ->
             Err
     end.
 
-reserved_word(Word) ->
-    erl_scan:reserved_word(Word).
-
 filter_tokens_by_kinds(Tokens, Kinds) ->
-?D(Tokens),
     lists:filter(fun({Kind,_, _, _}) -> not lists:member(Kind, Kinds) end, Tokens).
 
 filter_ws_tokens(L) ->
@@ -126,7 +123,7 @@ convert_tokens(Tokens) ->
 convert_tokens([], TokensAcc) ->
     lists:reverse(TokensAcc);
 convert_tokens([{white_space, Ann, V}=T0 | Rest], TokensAcc) ->
-    case V of   
+    case V of
         "\n" ->
             convert_tokens(Rest, [convert_token(T0) | TokensAcc]);
         [$\n | Text] ->
@@ -173,6 +170,20 @@ convert_tokens([{dot, Ann}=T0 | Rest], TokensAcc) ->
             T1 = {white_space, Ann6},
             convert_tokens(Rest, [convert_token(T1), convert_token(T) | TokensAcc])
     end;
+convert_tokens([{comment, Ann,_}=T | Rest], TokensAcc) ->
+    {A,B,C,D} = convert_token(T),
+    C0 = lists:reverse(C),
+    C1 = case C0 of
+            [$\r|_] -> lists:reverse(tl(C0));
+            _ -> C
+        end,
+    D0 = lists:reverse(D),
+    D1 = case D0 of
+            [$\r|_] -> lists:reverse(tl(D0));
+            _ -> D
+        end,
+    Z = {A, B, C1, D1},
+    convert_tokens(Rest, [Z | TokensAcc]);
 convert_tokens([T | Rest], TokensAcc) ->
     convert_tokens(Rest, [convert_token(T) | TokensAcc]).
 
@@ -185,6 +196,9 @@ convert_token({K, A}) ->
     {K, erl_anno:location(A), erl_anno:text(A), undefined};
 convert_token({K, A, V}) ->
     {K, erl_anno:location(A), erl_anno:text(A), V}.
+
+to_string(L) ->
+    lists:flatten([T || {_,_,T,_}<-L]).
 
 -ifdef(TEST).
 

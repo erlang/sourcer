@@ -1,45 +1,71 @@
+
 - _ALL_:
+  - id: $id
+  - parent: $id
+  - range: range
   - name_range: range
-  - def_range: range
-  - ref_ranges: [{file, [range]}]
-- file:
-  - * location: string
+- application: # from .app ?
+    # parent is root
+  - * name: string
+  - is_library: boolean
+- file: 
+    # parent is root (if none)
+  - * location: uri
+  - application: $id # not a parent, just a relation
   - is_library: boolean
 - module:
+    # parent is file
   - * name: atom
-  - file: file
-  - includes: [file]
+  - comments: [string]
+  - documentation: uri
 - include:
-  - * file: file
+    # parent is file, module or ifdef
   - * target: file
   - is_library: boolean
 - function:
-  - * module: module
+    # parent is file, module or ifdef
   - * name: atom
   - * arity: integer
   - is_exported: boolean
+  - comments: [string]
+  - documentation: uri
+  - spec: spec
 - type:
-  - * module: module
+    # parent is file, module or ifdef
   - * name: atom
   - * arity: integer
   - is_exported: boolean
+  - comments: [string]
+  - documentation: uri
 - macro:
-  - * file: file
+    # parent is file, module or ifdef
   - * name: atom
   - * arity: integer
 - record:
-  - * file: file
+    # parent is file, module or ifdef
   - * name: atom
 - field:
-  - * record: record
+    # parent is record
   - * name: string
+  - type: term
+- clause: # scope for variables
+    # parent is function
+    - signature: term
+- anonfun: # scope for variables
+    # parent is clause or anonfun
 - variable:
-  - * parent: function|macro
+    # parent is clause or anonfun
   - * name: atom
-  - * index: integer # can be several independent
 - ifdef:
-  - * file: file
+    # parent is file, module or ifdef
   - * condition: macro
-  - * index: integer # can be several
   - if_range: range
   - else_range: range
+
+---
+
+- reference:
+  - key: $id
+  - range: range
+  - kind: name of file|module|function|macro|record|type|field|variable 
+    # needed? can be deduced by checking $id

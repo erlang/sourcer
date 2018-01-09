@@ -43,7 +43,7 @@ cac_form(_, _D, _E, _I) ->
 %% special arity flags
 -define(ARI_TYPESPEC, -2).
 -define(ARI_ATTRIBUTE, -3).
--define(ARI_RECORD_DEF, -4).
+-define(ARI_parse_record, -4).
 -define(ARI_MACRO_DEF, -5).
 -define(ARI_INCLUDE, -6).
 -define(ARI_RECORD_FIELD_DEF, -7).
@@ -440,7 +440,7 @@ make_attribute_arg_refs(define, Name, [#token{}, #token{kind='('} | Rest]) ->
 make_attribute_arg_refs(define, Name, [#token{}, #token{kind=','} | Rest]) ->
     get_refs(Rest, Name, ?ARI_MACRO_DEF);
 make_attribute_arg_refs(record, {Name, Fields}, [#token{}, #token{kind=','} | Rest]) ->
-    get_record_field_defs(Fields, Name) ++ get_refs(Rest, Name, ?ARI_RECORD_DEF);
+    get_record_field_defs(Fields, Name) ++ get_refs(Rest, Name, ?ARI_parse_record);
 make_attribute_arg_refs(_, _, _) ->
     [].
 
@@ -463,8 +463,8 @@ make_attribute_ref(record, Between, _E) ->
                {N, _} -> N;
                N -> N
            end,
-    R= #record_def{name=Name},
-    {?ARI_RECORD_DEF, Name, R};
+    R= #parse_record{name=Name},
+    {?ARI_parse_record, Name, R};
 make_attribute_ref(define, [Name | _], _) when is_list(Name) ->
     {?ARI_MACRO_DEF, Name, #macro_def{name=Name}};
 make_attribute_ref(define, Name, _) ->

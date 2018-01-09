@@ -42,7 +42,7 @@
 -record(macro_def, {
     name
     }).
--record(record_def, {
+-record(parse_record, {
     name
     }).
 -record(type_ref, {

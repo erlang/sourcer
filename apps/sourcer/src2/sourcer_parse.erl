@@ -25,39 +25,27 @@
 %%
 
 -spec initial_parse(atom(), string(), string(), string(), boolean()) ->
-          {ok, #model{}, [#ref{}]}
-              | {error, term(), term()}.
+          {ok, #model{}, [#ref{}]}.
 
 initial_parse(ScannerName, ModuleFileName, InitialText, StateDir, 
               UpdateSearchServer) ->
-    try
-        ?D({ScannerName, ModuleFileName, UpdateSearchServer}),
-        RenewFun = fun(_F) ->
-                           Tokens = get_tokens(ScannerName, ModuleFileName,
-                                               InitialText, StateDir),
-                           {Model, Refs} =
-                               do_parse(ScannerName, Tokens, UpdateSearchServer),
-                           {Model, Refs}
-                   end,
-        {Model, Refs} = RenewFun(ModuleFileName),
-        {ok, Model, Refs}
-    catch
-        error:Reason ->
-            {error, Reason, erlang:get_stacktrace()}
-    end.
+    ?D({ScannerName, ModuleFileName, UpdateSearchServer}),
+    RenewFun = fun(_F) ->
+                        Tokens = get_tokens(ScannerName, ModuleFileName,
+                                            InitialText, StateDir),
+                        {Model, Refs} =
+                            do_parse(ScannerName, Tokens, UpdateSearchServer),
+                        {Model, Refs}
+                end,
+    {Model, Refs} = RenewFun(ModuleFileName),
+    {ok, Model, Refs}.
 
 -spec reparse(atom(), boolean()) ->
-          {ok, #model{}}
-              | {error, term(), term()}.
+          {ok, #model{}}.
 reparse(ScannerName, UpdateSearchServer) ->
-    try
-        Tokens = sourcer_scanner:get_tokens(ScannerName),
-        {Model, _Refs} = do_parse(ScannerName, Tokens, UpdateSearchServer),
-        {ok, Model}
-    catch
-        error:Reason ->
-            {error, Reason, erlang:get_stacktrace()}
-    end.
+    Tokens = sourcer_scanner:get_tokens(ScannerName),
+    {Model, _Refs} = do_parse(ScannerName, Tokens, UpdateSearchServer),
+    {ok, Model}.
 
 -spec get_module_refs(atom(), string(), string(), boolean()) -> [#ref{}].
 get_module_refs(ScannerName, ModulePath, StateDir, UpdateSearchServer) ->

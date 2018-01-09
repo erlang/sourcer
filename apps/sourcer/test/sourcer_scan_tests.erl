@@ -28,7 +28,7 @@ basic_tokens_test_() ->
         same_as_erl_scan("try"),
         same_as_erl_scan("a("),
         same_as_erl_scan("2.5."),
-        
+
         same_as_erl_scan("a ("),
         same_as_erl_scan("a\n("),
         same_as_erl_scan("a() -> b."),
@@ -50,7 +50,7 @@ special_tokens_test_() ->
                         {white_space, {0,1}, "\n", "\n"},
                         {white_space, {1,1}, "\n", "\n"},
                         {white_space, {2,1}, "  ", "  "},
-                        {atom, {2,3}, "a", 'a'}], 
+                        {atom, {2,3}, "a", 'a'}],
                     {2,4}},
                    sourcer_scan:string("\n\n  a")),
      ?_assertMatch({ok, [{macro, {0,1}, "?a", '?a'}], {0,3}},
@@ -67,7 +67,16 @@ special_tokens_test_() ->
                          {white_space, {0,5}, " ", " "},
                          {atom, {0,6}, "a", 'a'}],
                     {0,7}},
-                   sourcer_scan:string("a ?a a"))
+                   sourcer_scan:string("a ?a a")),
+     ?_assertMatch({ok, [{comment,{0,1},"%a", "%a"},{white_space,{0,3},"\n","\n"}],
+                    {1,1}},
+                    sourcer_scan:string("%a\n")),
+     ?_assertMatch({ok, [{comment,{0,1},"%a", "%a"},{white_space,{0,4},"\n","\n"}],
+                    {1,1}},
+                    sourcer_scan:string("%a\r\n")),
+    %% TODO should remove last quote
+     ?_assertMatch({ok, [{string, {0,1}, "\"foo\"", "foo"}], {0,6}},
+                   sourcer_scan:string("\"foo"))
     ].
 
 dot_test_() ->
@@ -129,25 +138,29 @@ same_as_erl_scan(Text) ->
     ).
 
 line_info_test_() ->
+    Z = case os:type() of
+        {win32,_} -> 1;
+        _ -> 0
+    end,
     [
-        ?_assertEqual([{0,0,0,""}], 
+        ?_assertEqual([{0,0,0,""}],
             sourcer_scan:line_info("")),
-        ?_assertEqual([{0,0,3,""}], 
+        ?_assertEqual([{0,0,3,""}],
             sourcer_scan:line_info("aaa")),
-        ?_assertEqual([{0,0,3,""},{1,4,3,""}], 
+        ?_assertEqual([{0,0,3,""},{1,4,3,""}],
             sourcer_scan:line_info("aaa\nbbb")),
-        ?_assertEqual([{0,0,3,""},{1,4,3,""}], 
+        ?_assertEqual([{0,0,3,""},{1,4,3,""}],
             sourcer_scan:line_info("aaa\rbbb")),
-        ?_assertEqual([{0,0,3,""},{1,5,3,""}], 
+        ?_assertEqual([{0,0,3,""},{1,5,3,""}],
             sourcer_scan:line_info("aaa\r\nbbb")),
         ?_assertEqual([
             {0,0,0,""},
-            {1,1,11,"        "},
-            {2,13,2,""},
-            {3,16,0,""},
-            {4,17,11,"    \t  "},
-            {5,29,0,""}
-            ], 
+            {1,1+Z,11,"        "},
+            {2,13+2*Z,2,""},
+            {3,16+3*Z,0,""},
+            {4,17+4*Z,11,"    \t  "},
+            {5,29+5*Z,0,""}
+            ],
         sourcer_scan:line_info("
         aaa
 rr
@@ -161,7 +174,7 @@ rr
             {3,17,0,""},
             {4,18,11,"    \t  "},
             {5,30,0,""}
-            ], 
+            ],
         sourcer_scan:line_info("\n        aaa\r\nrr\r\r    \t  last\n"))
     ].
 
@@ -193,3 +206,13 @@ rr
             "zz"
         ], select_text("aa\rbb\r\ncc\nzz"))
     ].
+
+to_string_test_() ->
+    [
+        check_to_string("2+a.\n\s"),
+        check_to_string("{ '2' + 3.5\"s\"")
+    ].
+
+check_to_string(T) ->
+    {ok, Ts, _} = sourcer_scan:string(T),
+    ?_assertEqual(T, sourcer_scan:to_string(Ts)).

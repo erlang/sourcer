@@ -6,25 +6,35 @@
 -behaviour(gen_server).
 
 -export([
-		 start_link/0,
+	start_link/0,
 
-		 show_message/2,
-		 show_message_request/3,
-		 log_message/2,
-		 telemetry_event/1,
-		 publish_diagnostics/2,
-		 register_capability/1,
-		 unregister_capability/1
-		]).
+	show_message/2,
+	show_message_request/3,
+	log_message/2,
+	telemetry_event/1,
+	publish_diagnostics/2,
+	register_capability/1,
+	unregister_capability/1,
+	apply_edit/1,
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+	workspaceFolders/0
+]).
+
+-export([
+	init/1, 
+	handle_call/3, 
+	handle_cast/2, 
+	handle_info/2, 
+	terminate/2, 
+	code_change/3
+]).
 
 -define(SERVER, ?MODULE).
 
 -record(state, {
-				crt_id = 0,
-				pending_requests = []
-			   }).
+		crt_id = 0,
+		pending_requests = []
+	}).
 
 start_link() ->
 	gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
@@ -47,15 +57,17 @@ publish_diagnostics(URI, Diagnostics) ->
 	gen_server:cast(?SERVER, {publish_diagnostics, URI, Diagnostics}).
 
 register_capability(Args) ->
-	gen_server:cast(?SERVER, {register_capability, Args}).
+	gen_server:call(?SERVER, {register_capability, Args, self()}).
 
 unregister_capability(Args) ->
-	gen_server:cast(?SERVER, {unregister_capability, Args}).
+	gen_server:call(?SERVER, {unregister_capability, Args, self()}).
 
-'workspace/applyEdit'(_State, _Query, Reporter) ->
-	%% symbol = #{name, kind, location, containerName?}}
-	Res = [],
-	Reporter({value, Res}).
+apply_edit(Args) ->
+	gen_server:call(?SERVER, {apply_edit, Args, self()}).
+
+workspaceFolders() ->
+	io:format("FOO\n"),
+	gen_server:call(?SERVER, {workspaceFolders, self()}).
 
 %%%%%%%%%%%%%%%%%%%%%
 
@@ -65,23 +77,58 @@ init([]) ->
 		},
 	{ok, State}.
 
-handle_call({'initialize', Id, ClientCapabilities}, 
-			_From, State) ->
+handle_call({show_message_request, Type, Msg, Actions, Pid}, _From,
+			State = #state{pending_requests=Reqs}) ->
+	Id = State#state.crt_id,
+	NewState = State#state{
+						    pending_requests = [{Id, Pid} | Reqs],
+						    crt_id = Id + 1
+						},
+	jsonrpc ! {request, Id, 'window/showMessageRequest',
+			 #{type => Type,
+			   message => unicode:characters_to_binary(Msg),
+			   actions => Actions}
+			},
 	%% TODO
-	{reply, ok, State};
-handle_call({register_capability, Args}, _From, State) ->
-	jsonrpc ! {request, 'client/register_capability',
-			 Args},
+	{reply, ok, NewState};
+handle_call({register_capability, Args, Pid}, _From, State = #state{pending_requests=Reqs}) ->
+	Id = State#state.crt_id,
+	NewState = State#state{
+						    pending_requests = [{Id, Pid} | Reqs],
+						    crt_id = Id + 1
+						},
+	jsonrpc ! {request, 'client/register_capability', Args, Pid},
 	%% TODO
-	{reply, ok, State};
-handle_call({unregister_capability, Args}, _from, State) ->
-	jsonrpc ! {request, 'client/unregister_capability',
-			 Args},
+	{reply, ok, NewState};
+handle_call({unregister_capability, Args, Pid}, _From, State = #state{pending_requests=Reqs}) ->
+	Id = State#state.crt_id,
+	NewState = State#state{
+						    pending_requests = [{Id, Pid} | Reqs],
+						    crt_id = Id + 1
+						},
+	jsonrpc ! {request, 'client/unregister_capability', Args, Pid},
 	%% TODO
-	{reply, ok, State};
-handle_call(Request,
-			_From, State) ->
-	io:format("HUH???... ~p~n", [Request]),
+	{reply, ok, NewState};
+handle_call({apply_edit, Args, Pid}, _From, State = #state{pending_requests=Reqs}) ->
+	Id = State#state.crt_id,
+	NewState = State#state{
+						    pending_requests = [{Id, Pid} | Reqs],
+						    crt_id = Id + 1
+						},
+	jsonrpc ! {request, 'workspace/applyEdit', Args, Pid},
+	%% TODO
+	{reply, ok, NewState};
+handle_call({workspaceFolders, Pid}, _From, State = #state{pending_requests=Reqs}) ->
+	Id = State#state.crt_id,
+	NewState = State#state{
+						    pending_requests = [{Id, Pid} | Reqs],
+						    crt_id = Id + 1
+						},
+	jsonrpc ! {request, 'workspace/workspaceFolders', Pid},
+	%% TODO
+	{reply, ok, NewState};
+handle_call(Request, From, State) ->
+	io:format("Unrecognized call from ~w: ~p~n", [From, Request]),
 	Reply = {error, {unknown, Request}},
 	{reply, Reply, State}.
 
@@ -94,19 +141,6 @@ handle_cast({show_message, Type, Msg}, State) ->
 			 #{type => Type,
 			   message => unicode:characters_to_binary(Msg)}},
 	{noreply, State};
-handle_cast({show_message_request, Type, Msg, Actions, Pid}, 
-			State = #state{pending_requests=Reqs}) ->
-	Id = State#state.crt_id,
-	NewState = State#state{
-						    pending_requests = [{Id, Pid} | Reqs],
-						    crt_id = Id + 1
-						},
-	jsonrpc ! {request, Id, 'window/showMessageRequest',
-			 #{type => Type,
-			   message => unicode:characters_to_binary(Msg),
-			   actions => Actions}
-			},
-	{noreply, NewState};
 handle_cast({log_message, Type, Msg}, State) ->
 	jsonrpc ! {notify, 'window/logMessage',
 			 #{type => Type,
@@ -120,7 +154,11 @@ handle_cast({publish_diagnostics, URI, Diagnostics}, State) ->
 			 #{uri => URI,
 			   diagnostics => Diagnostics}},
 	{noreply, State};
-handle_cast({'$reply', Id, Msg}, State) ->
+handle_cast(Other, State) ->
+	io:format("Unrecognized cast: ~p~n", [Other]),
+	{noreply, State}.
+
+handle_info({'$reply', Id, Msg}, State) ->
 	case lists:keytake(Id, 1, State#state.pending_requests) of
 		false ->
 			{noreply, State};
@@ -128,12 +166,8 @@ handle_cast({'$reply', Id, Msg}, State) ->
 			Pid ! Msg,
 			{noreply, State#state{pending_requests=Rest}}
 	end;
-handle_cast(Other, State) ->
-	io:format("Unrecognized message  ~p~n", [Other]),
-	{noreply, State}.
-
-handle_info(_Info, State) ->
-	io:format("@@@ ~p~n", [_Info]),
+handle_info(Info, State) ->
+	io:format("Unrecognized message: ~p~n", [Info]),
 	{noreply, State}.
 
 terminate(_Reason, _State) ->

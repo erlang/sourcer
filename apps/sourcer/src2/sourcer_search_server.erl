@@ -119,15 +119,10 @@ server_cmd(Command) ->
 
 server_cmd(Command, Args) ->
     start(),
-    try
-        ?SERVER ! {Command, self(), Args},
-        receive
-            {Command, _Pid, Result} ->
-                Result
-        end
-    catch
-        _:Exception ->
-            {error, Exception, erlang:get_stacktrace()}
+    ?SERVER ! {Command, self(), Args},
+    receive
+        {Command, _Pid, Result} ->
+            Result
     end.
 
 
@@ -157,10 +152,10 @@ cmd(Cmd, From, Args, State) ->
         end
     catch
         exit:Error ->
-            reply(Cmd, From, {exit, Error, erlang:get_stacktrace()}),
+            reply(Cmd, From, {exit, Error}),
             State;
         error:Error ->
-            reply(Cmd, From, {error, Error, erlang:get_stacktrace()}),
+            reply(Cmd, From, {error, Error}),
             State
     end.
 
