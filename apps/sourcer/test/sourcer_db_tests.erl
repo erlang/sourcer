@@ -56,7 +56,10 @@ merge_test_() ->
     ].
 
 persistence_test_() ->
-    F = "/tmp/f",
+    F = case os:type() of
+            {win32,_} -> "tmp/f";
+            _ -> "/tmp/f"
+        end,
     [
         {foreach,
             fun() -> file:delete(F), ok end,

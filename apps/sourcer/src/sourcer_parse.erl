@@ -42,6 +42,8 @@ parse_function(Ts, FullRange, Comments) ->
     Clauses = case hd(Ts) of
             ?k(atom) ->
                 split_at_semicolon_name(Ts);
+            ?k(var) ->
+                split_at_semicolon_name(Ts);
             _Other ->
                 split_at_semicolon_paren(Ts)
         end,
@@ -51,7 +53,7 @@ parse_function(Ts, FullRange, Comments) ->
     {_, _, Args1, _, _} = hd(Clauses1),
     Arity = length(Args1),
     case hd(Ts) of
-        {atom, _, _, Name}=TName ->
+        {K, _, _, Name}=TName when K==atom; K==var->
             {function, Name, Arity, Clauses1, Comments, range(TName), FullRange};
         Other ->
             %% anonymous fun
@@ -61,6 +63,8 @@ parse_function(Ts, FullRange, Comments) ->
 parse_clause(Ts, N) ->
     Toks = case hd(Ts) of
         ?k(atom) ->
+            tl(Ts);
+        ?k(var) ->
             tl(Ts);
         _ ->
             Ts
@@ -178,7 +182,6 @@ parse_spec(Ts) ->
     Fun = fun({X,_}) ->
                   {Args0,_,Return} = ?util:take_until_token(X, '->'),
                   {Args, _} = ?util:take_block_list(Args0),
-                  %% TODO process args and types here
                   {[parse_expr(A)||A<-Args], parse_expr(Return)}
           end,
     Sigs = [Fun(C) || C<-Cls],
@@ -218,7 +221,7 @@ parse_expr([?k(atom)=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
 parse_expr([{macro,_,_,'?MODULE'}=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, M, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([?k(atom)=F, ?k(?LPAR)=B|T]) ->
+parse_expr([?k(K)=F, ?k(?LPAR)=B|T]) when K==atom;K==var->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
 parse_expr([?k('fun')=F|T]) ->
@@ -270,16 +273,14 @@ range({_, P, T, _}) ->
 
 %% Split token list at "; Name ?LPAR", where Name is the same
 %% as the first token which must be an atom.
-take_until_semicolon_name([H|_]=L) ->
-    {atom, _, _, Name} = H,
-    Pred = fun  ([{atom,_,_,AName}, ?k(?LPAR)|_]) when AName==Name -> true;
+take_until_semicolon_name([{K, _, _, Name}|_]=L) when K==atom;K==var ->
+    Pred = fun  ([{AK,_,_,AName}, ?k(?LPAR)|_]) when AK==K, AName==Name -> true;
                 (_) -> false
             end,
     ?util:take_until_token(L , ';', Pred).
 
-split_at_semicolon_name([H|_]=L) ->
-    {atom, _, _, Name} = H,
-    Pred = fun  ([{atom,_,_,AName}, ?k(?LPAR)|_]) when AName==Name -> true;
+split_at_semicolon_name([{K, _, _, Name}|_]=L) when K==atom;K==var ->
+    Pred = fun  ([{AK,_,_,AName}, ?k(?LPAR)|_]) when AK==K, AName==Name -> true;
                 (_) -> false
             end,
     ?util:split_at_token(L , ';', Pred).

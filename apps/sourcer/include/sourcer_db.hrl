@@ -53,3 +53,4 @@
 -define(RCURL, '}').
 
 -define(k(X), {X,_,_,_}).
+-define(v(X), {_,_,_,X}).

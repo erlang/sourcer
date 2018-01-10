@@ -138,7 +138,8 @@ join_ctx(Ctx1, Ctx2) ->
 %%%%%%%%%%%%%%%%%%%%
 
 analyse(Forms) ->
-    merge([analyse_form(X) || X<-Forms]).
+    M = merge([analyse_form(X) || X<-Forms]),
+    adjust_keys(M).
 
 analyse_form({define, Name, Arity, Args, Value, Comments, Pos, FullRange}) ->
     Key = [{macro, Name, Arity}],
@@ -166,22 +167,22 @@ analyse_form({export_type, Args, _Comments}) ->
 analyse_form({export, Args, _Comments}) ->
     Refs = [{[{function,N,A}],P} || {N,A,P}<-Args],
     #model{refs=Refs};
-analyse_form({callback, _Module, _Name, _Arity, _Args, _Body, _Comments, _FullRange}) ->
-    %% TODO
-    #model{};
-analyse_form({callback, _Name, _Arity, _Args, _Body, _Comments, _FullRange}) ->
-    %% TODO
-    #model{};
-analyse_form({spec, Module, Name, Arity, _Args, _Comments, Pos, FullRange}) ->
+analyse_form({callback, Module, Name, Arity, Args, Body, Comments, FullRange}) ->
+    analyse_form({spec, Module, Name, Arity, Args, Body, Comments, FullRange});
+analyse_form({callback, Name, Arity, Args, Body, Comments, FullRange}) ->
+    analyse_form({spec, Name, Arity, Args, Body, Comments, FullRange});
+analyse_form({spec, Module, Name, Arity, Args, _Comments, Pos, FullRange}) ->
     %% TODO
     Key = [{module,Module},{function, Name, Arity}],
+    Ctx = new_ctx(),
     Refs = [{Key, Pos}],
-    #model{refs=Refs};
-analyse_form({spec, Name, Arity, _Args, _Comments, Pos, FullRange}) ->
+    analyse_type_clauses(Args, Ctx, #model{refs=Refs});
+analyse_form({spec, Name, Arity, Args, _Comments, Pos, FullRange}) ->
     %% TODO
     Key = [{function, Name, Arity}],
+    Ctx = new_ctx(),
     Refs = [{Key, Pos}],
-    #model{refs=Refs};
+    analyse_type_clauses(Args, Ctx, #model{refs=Refs});
 analyse_form({type, Name, Arity, Args, Def, Comments, Pos, FullRange}) ->
     Key = [{type, Name, Arity}],
     Ctx = new_ctx(Key),
@@ -262,10 +263,8 @@ analyse_exprs([{macro,_,Name,Args}=H|T], Ctx, Model=#model{defs=Defs, refs=Refs}
     Key = [{macro, macro_name(Name), macro_arity(Args)}],
     NewRefs = [{Key, range(H)}|Refs],
     analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
-analyse_exprs([{call, {_,_,_,Name}=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
-    % TODO
+analyse_exprs([{call, ?v(Name)=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
     Arity = length(Args),
-    %% TODO not good enough - rec field types, t ex
     case has_type(Ctx) of
         true ->
             NewCtx = push_ctx(Ctx, [{type, Name, Arity}]),
@@ -274,32 +273,54 @@ analyse_exprs([{call, {_,_,_,Name}=F, Args} | T], Ctx, Model=#model{refs=Refs}) 
             merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}) |
                 [analyse_exprs(A, Ctx, Model) || A<-Args]]);
         false ->
-            Key = get_ctx(push_ctx(Ctx, [{function, Name, Arity}])),
+            Key = [{function, Name, Arity}],
             NewRefs = [{Key, range(F)}|Refs],
             analyse_exprs(T, Ctx, Model#model{refs=NewRefs})
     end;
-analyse_exprs([{call, M, F, Args} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
-    % TODO
-    analyse_exprs(T, Ctx, Model);
-analyse_exprs([{funref, M, F, Args} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
-    % TODO
-    analyse_exprs(T, Ctx, Model);
-analyse_exprs([{defun, M, F, Args} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
-    % TODO
-    analyse_exprs(T, Ctx, Model);
-analyse_exprs([{record, {_,_,_,N}=R, F} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
+analyse_exprs([{call, ?v(Mod)=M, ?v(Fun)=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
+    Arity = length(Args),
+    case has_type(Ctx) of
+        true ->
+            NewCtx = push_ctx(Ctx, [{type, Fun, Arity}]),
+            Key = get_ctx(NewCtx),
+            NewRefs = [{Key, range(F)}|Refs],
+            merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}) |
+                [analyse_exprs(A, Ctx, Model) || A<-Args]]);
+        false ->
+            Key = [{module, Mod}, {function, Fun, Arity}],
+            NewRefs = [{Key, range(F)}|Refs],
+            analyse_exprs(T, Ctx, Model#model{refs=NewRefs})
+    end;
+analyse_exprs([{funref, ?v(Mod)=M, ?v(Fun)=F, ?v(A)} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
+    Key = [{module, Mod}, {function, Fun, A}],
+    NewRefs = [{Key, range(F)}|Refs],
+    analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
+analyse_exprs([{defun, '', A, Ix, Clauses, Pos} | T], Ctx, Model) ->
+    NewCtx = push_ctx(Ctx, [{function, Ix, A}]),
+    merge([analyse_exprs(T, Ctx, Model) |
+            [analyse_clause(C, NewCtx) || C<-Clauses]]);
+analyse_exprs([{defun, FN, Args, Ix, Clauses, Pos} | T], Ctx, Model=#model{defs=Defs}) ->
+    NewCtx = push_ctx(Ctx, [{function, FN, Args}]),
+    Key = get_ctx(NewCtx),
+    NewDefs = [{Key, Pos}|Defs],
+    merge([analyse_exprs(T, Ctx, Model#model{defs=NewDefs}) |
+            [analyse_clause(C, NewCtx) || C<-Clauses]]);
+analyse_exprs([{record, ?v(N)=R, F} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     Key = [{record, N}],
     NewRefs = [{Key, range(R)}|Refs],
     analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
-analyse_exprs([{recfield, M, F, Args} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
-    % TODO
-    analyse_exprs(T, Ctx, Model);
+analyse_exprs([{recfield, ?v(RN)=R, ?v(FN)=F} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
+    KeyR = [{record, RN}],
+    KeyF = [{record, RN},{field, FN}],
+
+    NewRefs = [{KeyR, range(R)},{KeyF, range(F)}|Refs],
+    analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
 analyse_exprs([_|T], Ctx, Model) ->
     analyse_exprs(T, Ctx, Model).
 
 analyse_type([], Ctx, Model) ->
     Model;
-analyse_type([{call,{_,_,_,Name}=Target,Args}|T], Ctx, Model) ->
+analyse_type([{call,?v(Name)=Target,Args}|T], Ctx, Model) ->
     case lists:member(Name, predefined_types()) of
         true ->
             Model;
@@ -313,7 +334,7 @@ analyse_type([{call,{_,_,_,Name}=Target,Args}|T], Ctx, Model) ->
             Model2 = [analyse_exprs(A, Ctx, Model)||A<-Args],
             merge([M,Model|Model2])
     end;
-analyse_type([{call,{_,_,_,M},{_,_,_,Name}=Target,Args}|T], Ctx, Model) ->
+analyse_type([{call,?v(M),?v(Name)=Target,Args}|T], Ctx, Model) ->
     Key = [{module,M},{type, Name, length(Args)}],
     Model1 = #model{
         refs=[
@@ -324,6 +345,12 @@ analyse_type([{call,{_,_,_,M},{_,_,_,Name}=Target,Args}|T], Ctx, Model) ->
     merge([Model1,Model|Model2]);
 analyse_type(L, Ctx, Model) ->
     analyse_exprs(L, Ctx, Model).
+
+analyse_type_clauses(Clauses, Ctx, Model) ->
+    Fun = fun({Args,Return}) ->
+            merge([analyse_type(Args, Ctx, Model), analyse_type(Return, Ctx, Model)])
+        end,
+    merge([Fun(C) || C<-Clauses]).
 
 comments_info(Comments, Key) ->
     case Comments of
@@ -384,3 +411,28 @@ macro_name("?"++Name) ->
     list_to_atom(Name);
 macro_name(X) ->
     X.
+
+adjust_keys(M=#model{defs=D, refs=R}) ->
+    Fun = fun({[{module,_}],_,_,_})->false; (_)->true end,
+    L = lists:dropwhile(Fun, D),
+    case L of
+        [{[{module,Mod}=K],_,_,_}|_] ->
+            M#model{
+                defs=fix_keys(D, K),
+                refs=fix_keys(R, K)
+            };
+        _ ->
+            M
+    end.
+
+fix_keys(L, K) ->
+    [fix_key(E,K) || E<-L].
+
+fix_key(E, K) ->
+    KK = element(1, E),
+    case hd(KK) of
+        K ->
+            E;
+        _ ->
+            setelement(1, E, [K|KK])
+    end.

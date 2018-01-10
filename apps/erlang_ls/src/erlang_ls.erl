@@ -51,6 +51,7 @@ dump_file(File) ->
     io:format("Dump: ~tp~n", [File]),
     {ok, Content} = file:read_file(File),
     {model,_,D,R} = sourcer_db:analyse(sourcer_parse:parse(scan(Content))),
-    io:format("Definitions:::~n~p~n-----~n", [lists:sort(D)]),
-    io:format("References:::~n~p~n-----~n", [lists:sort(R)]),
+    C = case io:columns() of {ok, Cc} -> Cc; _ -> 80 end,
+    io:format("Definitions:::~n~*p~n-----~n", [C, lists:sort(D)]),
+    io:format("References:::~n~*p~n-----~n", [C, lists:sort(R)]),
     ok.

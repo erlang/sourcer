@@ -1,5 +1,5 @@
-%% do not format this file
-%% the strings need to be in the first column
+%% do not autoformat this file
+%% the strings need to start in the first column
 
 {
 "",
@@ -177,14 +177,19 @@
             {{1,1},{1,27}}}
     ],
     {
-        [],
-        []
+        [
+            {[{var,'Y'}],{{1,25},{1,26}},none,#{}}
+        ],
+        [
+            {[{function,bar,1}],{{1,11},{1,14}}}
+        ]
     }
 }.
 
 {
 "%123
--spec foo(X :: integer(), Y) -> string(); (Z)->'ok'.",
+-spec foo(X :: integer(), Y) -> string(); (Z)->'ok'.
+-spec m:bar() -> g:myatom().",
     [
         {spec,foo,2,
             [{[[{var,{1,11},"X",'X'},
@@ -194,11 +199,23 @@
                 {[[{var,{1,44},"Z",'Z'}]],[]}],
             [<<"123">>],
             {{1,7},{1,10}},
-            {{1,1},{1,52}}}
+            {{1,1},{1,52}}},
+         {spec,m,bar,0,
+            [{[],
+                [{call,{atom,{2,18},"g",g},
+                        {atom,{2,20},"myatom",myatom},
+                        []}]}],
+            [],
+            {{2,9},{2,12}},
+            {{2,1},{2,28}}}
     ],
     {
         [],
-        [{[{function,foo,2}],{{1,7},{1,10}}}]
+        [
+            {[{module,g},{type,myatom,0}],{{2,20},{2,26}}},
+            {[{module,m},{function,bar,0}],{{2,9},{2,12}}},
+            {[{function,foo,2}],{{1,7},{1,10}}}
+        ]
     }
 }.
 
@@ -266,33 +283,36 @@
 
 {
 "%123
--record(r,{a::string(),b,c=0,d::[x:baz()]=3}).",
+-record(r,{a::fun(),b,c=0,d::[x:baz()]=3}).",
     [
         {record,r,
             [<<"123">>],
             {{1,9},{1,10}},
-            [{field,{{1,12},{1,13}},
-                    a,
-                    [{call,{atom,{1,15},"string",string},[]}],
-                    []},
-            {field,{{1,24},{1,25}},b,[],[]},
-            {field,{{1,26},{1,27}},c,[],[]},
-            {field,{{1,30},{1,31}},
-                    d,
-                    [{call,{atom,{1,34},"x",x},{atom,{1,36},"baz",baz},[]}],
+            [{field,{{1,12},{1,13}},a,
+                [{defun,'',0,1,
+                    [{clause,1,[],[],[]}],
+                    {{1,18},{1,19}}}],
+                []},
+            {field,{{1,21},{1,22}},b,[],[]},
+            {field,{{1,23},{1,24}},c,[],[]},
+            {field,{{1,27},{1,28}},d,
+                [{call,
+                    {atom,{1,31},"x",x},
+                    {atom,{1,33},"baz",baz},
                     []}],
-            {{1,1},{1,46}}}
+                []}],
+            {{1,1},{1,43}}}
     ],
     {
         [
-            {[{record,r}],{{1,9},{1,10}},{{1,1},{1,46}},#{comments=>[<<"123">>]}},
+            {[{record,r}],{{1,9},{1,10}},{{1,1},{1,43}},#{comments => [<<"123">>]}},
             {[{record,r},{field,a}],{{1,12},{1,13}},none,#{}},
-            {[{record,r},{field,b}],{{1,24},{1,25}},none,#{}},
-            {[{record,r},{field,c}],{{1,26},{1,27}},none,#{}},
-            {[{record,r},{field,d}],{{1,30},{1,31}},none,#{}}
+            {[{record,r},{field,b}],{{1,21},{1,22}},none,#{}},
+            {[{record,r},{field,c}],{{1,23},{1,24}},none,#{}},
+            {[{record,r},{field,d}],{{1,27},{1,28}},none,#{}}
         ],
         [
-            {[{module,x},{type,baz,0}],{{1,36},{1,39}}}
+            {[{module,x},{type,baz,0}],{{1,33},{1,36}}}
         ]
     }
 }.
@@ -424,7 +444,7 @@ foo() -> ok.",
     {
         [
             {[{module,mx}],{{1,9},{1,11}},none,#{comments=>[<<"hello">>]}},
-            {[{function,foo,0}],{{3,1},{3,4}},{{3,1},{3,12}},#{comments=>[<<"baz">>]}}
+            {[{module,mx},{function,foo,0}],{{3,1},{3,4}},{{3,1},{3,12}},#{comments=>[<<"baz">>]}}
         ],
         []
     }
@@ -478,8 +498,9 @@ d:g(?Z),
 #rr.ff,
 #fg{gf=g(Y)},
 fun(A)->X;(B)->Y end,
-Qok;
-bar(_+1)-> ok.
+fun Z(A)->X;Z(B)->Y end,
+Qok-X;
+bar(_+X)-> ok.
 
 quux()->ok.
 -type foo(X) :: bar().
@@ -520,31 +541,60 @@ quux()->ok.
                             [],
                             [{var,{7,16},"Y",'Y'}]}],
                         {{7,4},{7,5}}},
-                    {var,{8,1},"Qok",'Qok'}]},
-            {clause,2,[[]],[],[]}],
+                    {defun,'Z',1,1,
+                            [{clause,1,
+                            [[{var,{8,7},"A",'A'}]],
+                            [],
+                            [{var,{8,11},"X",'X'}]},
+                            {clause,2,
+                            [[{var,{8,15},"B",'B'}]],
+                            [],
+                            [{var,{8,19},"Y",'Y'}]}],
+                        {{8,5},{8,6}}},
+                    {var,{9,1},"Qok",'Qok'},
+                    {var,{9,5},"X",'X'}]},
+            {clause,2,[[{var,{10,7},"X",'X'}]],[],[]}],
             [],
             {{0,1},{0,4}},
-            {{0,1},{9,14}}},
-        {function,quux,0,[{clause,1,[],[],[]}],[],{{11,1},{11,5}},{{11,1},{11,11}}},
+            {{0,1},{10,14}}},
+        {function,quux,0,[{clause,1,[],[],[]}],[],{{12,1},{12,5}},{{12,1},{12,11}}},
         {type,foo,1,
-            [[{var,{12,11},"X",'X'}]],
-            [{call,{atom,{12,17},"bar",bar},[]}],
+            [[{var,{13,11},"X",'X'}]],
+            [{call,{atom,{13,17},"bar",bar},[]}],
             [],
-            {{12,7},{12,10}},
-            {{12,1},{12,22}}}
+            {{13,7},{13,10}},
+            {{13,1},{13,22}}}
     ],
     {
         [   %todo,
-            {[{function,bar,1}],{{0,1},{0,4}},{{0,1},{9,14}},#{}},
-            {[{function,bar,1},{clause,1},{var,'Qok'}],{{8,1},{8,4}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,'Z',1}],{{8,5},{8,6}}},
+            {[{function,bar,1}],{{0,1},{0,4}},{{0,1},{10,14}},#{}},
+            {[{function,bar,1},{clause,1},{var,'Qok'}],{{9,1},{9,4}},none,#{}},
             {[{function,bar,1},{clause,1},{var,'X'}],{{0,8},{0,9}},none,#{}},
-            {[{function,quux,0}],{{11,1},{11,5}},{{11,1},{11,11}},#{}},
-            {[{type,foo,1}],{{12,7},{12,10}},{{12,1},{12,22}},#{}},
-            {[{type,foo,1},{var,'X'}],{{12,11},{12,12}},none,#{}}],
+            {[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'A'}],{{7,5},{7,6}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'X'}],{{7,9},{7,10}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'B'}],{{7,12},{7,13}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'Y'}],{{7,16},{7,17}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'A'}],{{8,7},{8,8}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'X'}],{{8,11},{8,12}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'B'}],{{8,15},{8,16}},none,#{}},
+            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'Y'}],{{8,19},{8,20}},none,#{}},
+            {[{function,bar,1},{clause,2},{var,'X'}],{{10,7},{10,8}},none,#{}},
+            {[{function,quux,0}],{{12,1},{12,5}},{{12,1},{12,11}},#{}},
+            {[{type,foo,1}],{{13,7},{13,10}},{{13,1},{13,22}},#{}},
+            {[{type,foo,1},{var,'X'}],{{13,11},{13,12}},none,#{}}
+        ],
         [
+            {[{module,'?MODULE'},{function,g,0}],{{4,9},{4,10}}},
+            {[{module,d},{function,g,1}],{{3,3},{3,4}}},
+            {[{module,m},{function,f,3}],{{1,7},{1,8}}},
             {[{record,fg}],{{6,2},{6,4}}},
-            {[{function,bar,1},{clause,1},{function,b,2}],{{2,1},{2,2}}},
-            {[{type,bar,0}],{{12,17},{12,20}}}
+            {[{record,rr}],{{5,2},{5,4}}},
+            {[{record,rr},{field,ff}],{{5,5},{5,7}}},
+            {[{function,b,2}],{{2,1},{2,2}}},
+            {[{function,bar,1},{clause,1},{var,'X'}],
+            {{9,5},{9,6}}},
+            {[{type,bar,0}],{{13,17},{13,20}}}
         ]
     }
 }.
@@ -593,10 +643,19 @@ quux()->ok.
     ],
     {
         [
+            % todo
             {[{type,f1,0}],{{0,7},{0,9}},{{0,1},{0,20}},#{}},
             {[{type,f2,0}],{{1,7},{1,9}},{{1,1},{1,28}},#{}},
+            {[{type,f2,0},{function,1,1},{clause,1},{var,'X'}],
+                {{1,26},{1,27}},none,#{}},
             {[{type,f3,1}],{{2,7},{2,9}},{{2,1},{2,32}},#{}},
-            {[{type,f4,0}],{{3,7},{3,9}},{{3,1},{3,26}},#{}}
+            {[{type,f3,1},{function,1,1},{clause,1},{var,'X'}],
+                {{2,30},{2,31}},none,#{}},
+            {[{type,f4,0}],{{3,7},{3,9}},{{3,1},{3,26}},#{}},
+            {[{type,f4,0},{function,1,1},{clause,1},{var,'X'}],
+                {{3,24},{3,25}},none,#{}},
+            {[{type,f4,0},{function,1,1},{clause,1},{var,'Y'}],
+                {{3,20},{3,21}},none,#{}}
         ],
         [
             %todo
