@@ -22,8 +22,8 @@ parse(Tokens) ->
     lists:flatten([parse_form(F, Dot) || {F, {_,Dot,_,_}}<-Forms]).
 
 parse_form(Tokens, Dot) ->
-    {NewTs, TopComments} = preprocess_form(Tokens),
-    parse_form(NewTs, Dot, TopComments).
+    {NewTs, Comments} = preprocess_form(Tokens),
+    parse_form(NewTs, Dot, Comments).
 
 %% keep track of macro context
 preprocess_form(Ts) ->
@@ -33,7 +33,7 @@ preprocess_form(Ts) ->
 
 parse_form([{'-',P0,_,_}|Tail], Dot, Comments) ->
     parse_attribute(Tail, {P0, Dot}, Comments);
-parse_form([{atom,P0,_,_},?k(?LPAR)|_]=Ts, Dot, Comments) ->
+parse_form([{atom,P0,_,_}, ?k(?LPAR)|_]=Ts, Dot, Comments) ->
     parse_function(Ts, {P0, Dot}, Comments);
 parse_form(_Ts, _Dot, _Comments) ->
     [].
@@ -45,26 +45,18 @@ parse_function(Ts, FullRange, Comments) ->
             _Other ->
                 split_at_semicolon_paren(Ts)
         end,
-    {C, _} = hd(Clauses),
-    Arity = case hd(Ts) of
-            ?k(atom) ->
-                get_arity(tl(C));
-            _ ->
-                get_arity(C)
-        end,
     Clauses1 = [parse_clause(C, N)
                 || {{C,_},N}<-lists:zip(Clauses,lists:seq(1,length(Clauses)))
             ],
+    {_, _, Args1, _, _} = hd(Clauses1),
+    Arity = length(Args1),
     case hd(Ts) of
         {atom, _, _, Name}=TName ->
             {function, Name, Arity, Clauses1, Comments, range(TName), FullRange};
         Other ->
+            %% anonymous fun
             {function, '', Arity, Clauses1, Comments, range(Other), FullRange}
     end.
-
-get_arity(Ts) ->
-    {Args, _} = ?util:take_block_list(Ts),
-    length(Args).
 
 parse_clause(Ts, N) ->
     Toks = case hd(Ts) of
@@ -136,13 +128,13 @@ parse_attribute([{atom,Pos, _, 'import'}|Ts], FullRange, Comments) ->
     Fs1 = ?util:split_at_token(?util:middle(Fs0), ','),
     Fs = [{F,A,range(P1,P2,T2)} || {[{atom,P1,_,F},_,{integer,P2,T2,A}],_} <- Fs1],
     {import, M, Fs, Comments};
-parse_attribute([{atom,_, _, 'module'},?k(?LPAR),{atom,_, _, Name}=N|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'module'}, ?k(?LPAR),{atom,_, _, Name}=N|_], FullRange, Comments) ->
     {module, Name, Comments, range(N)};
 parse_attribute([{atom,Pos, _, 'compile'}|Ts], FullRange, Comments) ->
     {compile, Pos, ?util:middle(Ts), Comments};
-parse_attribute([{atom,_, _, 'include'},?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'include'}, ?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
     {include, Str, Comments, range(S)};
-parse_attribute([{atom,_, _, 'include_lib'},?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'include_lib'}, ?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
     {include_lib, Str, Comments, range(S)};
 parse_attribute([{atom,_, _, Name}|Ts], FullRange, Comments) ->
     {attribute, Name, ?util:middle(Ts), Comments}.
@@ -204,6 +196,9 @@ parse_exprs(Ts) ->
     Exprs = ?util:split_at_token(Ts, ','),
     lists:flatten([parse_expr(E) || {E, _}<-Exprs]).
 
+parse_expr_list(L) ->
+    [parse_expr(E) || E<-L].
+
 parse_expr([]) ->
     [];
 parse_expr(none) ->
@@ -212,38 +207,40 @@ parse_expr([{var,_,_,'_'}|T]) ->
     parse_expr(T);
 parse_expr([?k(var)=V|T]) ->
     [V | parse_expr(T)];
-parse_expr([?k('fun'),?k(atom)=M,?k(':'),?k(atom)=F,
-                ?k('/'),?k(integer)=A | T]) ->
+parse_expr([?k('fun'), ?k(atom)=M, ?k(':'), ?k(atom)=F,
+                ?k('/'), ?k(integer)=A | T]) ->
     [{funref, M, F, A} | parse_expr(T)];
-parse_expr([?k('fun'),?k(atom)=F,?k('/'),?k(integer)=A | T]) ->
+parse_expr([?k('fun'), ?k(atom)=F, ?k('/'), ?k(integer)=A | T]) ->
     [{funref, F, A} | parse_expr(T)];
-parse_expr([?k(atom)=M,?k(':'),?k(atom)=F,?k(?LPAR)=B|T]) ->
+parse_expr([?k(atom)=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, M, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([{macro,_,_,'?MODULE'}=M,?k(':'),?k(atom)=F,?k(?LPAR)=B|T]) ->
+parse_expr([{macro,_,_,'?MODULE'}=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, M, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([?k(atom)=F,?k(?LPAR)=B|T]) ->
+parse_expr([?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
 parse_expr([?k('fun')=F|T]) ->
     {Args, Rest} = ?util:take_block_list([F|T]),
-    [{defun, parse_function(hd(Args), none, [])} | parse_expr(Rest)];
-parse_expr([{macro,P,N,_},?k(?LPAR)=B|T]) ->
+    {function, N, A, Clauses, _, Pos, _} = parse_function(hd(Args), none, []),
+    Ix = 1, %% TODO global function index
+    [{defun, N, A, Ix, Clauses, Pos} | parse_expr(Rest)];
+parse_expr([{macro,P,N,_}, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{macro, P, N, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
 parse_expr([{macro,P,N,_} | T]) ->
     [{macro, P, N, none} | parse_expr(T)];
-parse_expr([?k('#'),?k(atom)=R,?k('.'),?k(atom)=F | T]) ->
+parse_expr([?k('#'), ?k(atom)=R, ?k('.'), ?k(atom)=F | T]) ->
     [{recfield, R, F} | parse_expr(T)];
-parse_expr([?k('#'),?k(atom)=R,?k(?LCURL)=B | T]) ->
+parse_expr([?k('#'), ?k(atom)=R, ?k(?LCURL)=B | T]) ->
     {Data, Rest} = ?util:take_block_list([B|T]),
     Fields = [parse_field(D)||D<-Data],
     [{record, R, Fields} | parse_expr(Rest)];
 parse_expr([_|T]) ->
     parse_expr(T).
 
-parse_field([?k(atom)=F,?k('=')|T]) ->
+parse_field([?k(atom)=F, ?k('=')|T]) ->
     {F, parse_expr(T)}.
 
 predef_macros(Module, File) ->
@@ -275,14 +272,14 @@ range({_, P, T, _}) ->
 %% as the first token which must be an atom.
 take_until_semicolon_name([H|_]=L) ->
     {atom, _, _, Name} = H,
-    Pred = fun  ([{atom,_,_,AName},?k(?LPAR)|_]) when AName==Name -> true;
+    Pred = fun  ([{atom,_,_,AName}, ?k(?LPAR)|_]) when AName==Name -> true;
                 (_) -> false
             end,
     ?util:take_until_token(L , ';', Pred).
 
 split_at_semicolon_name([H|_]=L) ->
     {atom, _, _, Name} = H,
-    Pred = fun  ([{atom,_,_,AName},?k(?LPAR)|_]) when AName==Name -> true;
+    Pred = fun  ([{atom,_,_,AName}, ?k(?LPAR)|_]) when AName==Name -> true;
                 (_) -> false
             end,
     ?util:split_at_token(L , ';', Pred).

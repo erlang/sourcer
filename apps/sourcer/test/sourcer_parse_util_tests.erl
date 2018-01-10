@@ -6,13 +6,13 @@
 
 extract_top_comments_test_() ->
     [
-     ?_assertMatch({["a","b","c"],
+     ?_assertMatch({[<<"a">>,<<"b">>,<<"c">>],
                   [{atom,_,"hello",hello}]},
             ?SUT:extract_top_comments(scan_ws("%a\n%b\n  %%c\nhello"))),
-     ?_assertMatch({["a"],
+     ?_assertMatch({[<<"a">>],
                   [{atom,_,"hello",hello}]},
             ?SUT:extract_top_comments(scan_ws("%a\n   \n\nhello"))),
-     ?_assertMatch({["c"],
+     ?_assertMatch({[<<"c">>],
                   [{atom,_,"hello",hello}]},
             ?SUT:extract_top_comments(scan_ws("%a\n%b\n\n\n%%c\nhello")))
     ].
@@ -39,21 +39,21 @@ take_until_token_test_() ->
 
 take_until_matching_token_test_() ->
     [
-        ?_assertMatch({{'(',_,_,_},[],none,[]}, 
+        ?_assertMatch({{'(',_,_,_},[],none,[]},
             ?SUT:take_until_matching_token({'(', 1,2,3}, [])),
-        ?_assertMatch({{'(',_,_,_},[{atom,_,_,a},{',',_,_,_},{atom,_,_,b}], none, []}, 
+        ?_assertMatch({{'(',_,_,_},[{atom,_,_,a},{',',_,_,_},{atom,_,_,b}], none, []},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("a,b"))),
-        ?_assertMatch({{'(',_,_,_},[{atom,_,_,a},{',',_,_,_},{'(',_,_,_},{atom,_,_,b}], none, []}, 
+        ?_assertMatch({{'(',_,_,_},[{atom,_,_,a},{',',_,_,_},{'(',_,_,_},{atom,_,_,b}], none, []},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("a,(b"))),
-        ?_assertMatch({{'(',_,_,_}, [{atom,_,_,a},{',',_,_,_},{atom,_,_,b}], {')',_,_,_}, []}, 
+        ?_assertMatch({{'(',_,_,_}, [{atom,_,_,a},{',',_,_,_},{atom,_,_,b}], {')',_,_,_}, []},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("a,b)"))),
-        ?_assertMatch({{'if',_,_,_}, [], {'end',_,_,_}, []}, 
+        ?_assertMatch({{'if',_,_,_}, [], {'end',_,_,_}, []},
             ?SUT:take_until_matching_token({'if', 1,2,3}, scan("end"))),
-        ?_assertMatch({{'(',_,_,_},[{'[',_,_,_},{']',_,_,_}],{')',_,_,_}, [{atom,_,_,a}]}, 
+        ?_assertMatch({{'(',_,_,_},[{'[',_,_,_},{']',_,_,_}],{')',_,_,_}, [{atom,_,_,a}]},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("[])a"))),
-        ?_assertMatch({{'(',_,_,_},[{'(',_,_,_},{')',_,_,_}],{')',_,_,_}, [{atom,_,_,a}]}, 
+        ?_assertMatch({{'(',_,_,_},[{'(',_,_,_},{')',_,_,_}],{')',_,_,_}, [{atom,_,_,a}]},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("())a"))),
-        ?_assertMatch({{'(',_,_,_},[{'(',_,_,_},{atom,_,_,b},{',',_,_,_},{atom,_,_,c},{')',_,_,_}],{')',_,_,_}, [{atom,_,_,a},{',',_,_,_}]}, 
+        ?_assertMatch({{'(',_,_,_},[{'(',_,_,_},{atom,_,_,b},{',',_,_,_},{atom,_,_,c},{')',_,_,_}],{')',_,_,_}, [{atom,_,_,a},{',',_,_,_}]},
             ?SUT:take_until_matching_token({'(', 1,2,3}, scan("(b,c))a,")))
     ].
 
@@ -74,7 +74,7 @@ split_at_token_test_() ->
             ],
                 ?SUT:split_at_token(scan("a.\nb."), dot)),
     ?_assertEqual([
-                {scan("a"), {dot,{0,2},".",undefined}}, 
+                {scan("a"), {dot,{0,2},".",undefined}},
                 {scan("b", {0,4}), {dot,{0,5},".",undefined}}
             ],
                 ?SUT:split_at_token(scan("a. b."), dot)),

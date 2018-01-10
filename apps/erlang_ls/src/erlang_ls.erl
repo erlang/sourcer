@@ -50,8 +50,7 @@ scan(D) ->
 dump_file(File) ->
     io:format("Dump: ~tp~n", [File]),
     {ok, Content} = file:read_file(File),
-    {model,_,D,R,I} = sourcer_db:analyse(sourcer_parse:parse(scan(Content))),
+    {model,_,D,R} = sourcer_db:analyse(sourcer_parse:parse(scan(Content))),
     io:format("Definitions:::~n~p~n-----~n", [lists:sort(D)]),
     io:format("References:::~n~p~n-----~n", [lists:sort(R)]),
-    io:format("Info:::~n~p~n-----~n", [lists:sort(I)]),
     ok.

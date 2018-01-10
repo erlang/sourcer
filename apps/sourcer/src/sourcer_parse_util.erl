@@ -1,7 +1,7 @@
 -module(sourcer_parse_util).
 
 -export([
-    get_line_text/2, 
+    get_line_text/2,
     get_line_text/3,
 
     extract_top_comments/1,
@@ -32,16 +32,16 @@ get_line_text(String, Index, LineInfo) ->
     get_line_text(String, I).
 
 extract_top_comments(Toks) ->
-    Toks1 = remove_inline_whitespace(Toks), 
+    Toks1 = remove_inline_whitespace(Toks),
     % keep comments and whitespace at beginning
-    SplitFun = fun(?k(white_space))->true; 
-                    (?k(comment))->true; 
-                    (_)->false 
+    SplitFun = fun(?k(white_space)) -> true;
+                    (?k(comment)) -> true;
+                    (_) -> false
                 end,
     {Toks2, Rest} = lists:splitwith(SplitFun, Toks1),
     % remove last lines of whitespace
-    DropFun = fun(?k(white_space))->true; 
-                 (_)->false         
+    DropFun = fun(?k(white_space))->true;
+                 (_) -> false
               end,
     Toks3 = lists:reverse(lists:dropwhile(DropFun, lists:reverse(Toks2))),
     {skip_unrelated_comments(Toks3, []), Rest}.
@@ -65,15 +65,15 @@ skip_unrelated_comments([?k(white_space)=_C|Toks], Acc) ->
 compact_comments([]) ->
     [];
 compact_comments(L) ->
-    Fun = fun({comment, _, _, C}, Acc) -> [skip_percent(C)|Acc] end,
-    lists:reverse(lists:foldl(Fun, [], L)).
+    Text = [[unicode:characters_to_binary(string:trim(skip_percent(C), trailing))] || {comment,_,_,C}<-L],
+    lists:append(Text).
 
-%% split list at the first occurence of delimiter; 
+%% split list at the first occurence of delimiter;
 %% if delimiter not found, return whole list as result.
 take_until_token(L, Delim) ->
     take_until_token(L, Delim, fun(_)-> true end).
 
-%% split list at the first occurence of delimiter and where 
+%% split list at the first occurence of delimiter and where
 %% Pred(Rest) == true; if Pred is never true, return whole list as result;
 %% if encountering blocks, handle them properly.
 take_until_token(L, Delim, Pred) ->
@@ -87,7 +87,7 @@ take_until_token([?k(Delim)=H|Rest], Delim, Pred, R) ->
             {lists:flatten(lists:reverse(R)), H, Rest};
         false ->
             take_until_token(Rest, Delim, Pred, [H|R])
-    end;    
+    end;
 take_until_token([?k(K)=H|Rest], Delim, Pred, R) ->
     case lists:keyfind(K, 1, get_block_tokens()) of
         false ->
@@ -110,7 +110,7 @@ take_until_token([?k(K)=H|Rest], Delim, Pred, R) ->
                 _ ->
                     false
             end,
-            case Rest2 of  
+            case Rest2 of
                 false ->
                     {HH, LL, TT, RR} = take_until_matching_token(H, Rest),
                     case TT of

@@ -28,18 +28,17 @@
                 {type,atom(),integer()}.
 -type ctx() :: [key()].
 
--type def() :: {ctx(), Name::range()} |
-                {ctx(), Name::range(), Full::range()}.
+-type def() :: {ctx(), Name::range(), Info :: #{}} |
+                {ctx(), Name::range(), Full::range(), Info :: #{}}.
 -type ref() :: {ctx(), range()}.
 
 -type uri() :: binary().
 -type info() :: {ctx(), any()}.
 
 -record(model, {
-    vsn = 1,
+    vsn = 1 :: integer(),
     defs = [] :: [def()],
-    refs = [] :: [ref()],
-    info = [] :: [info()]
+    refs = [] :: [ref()]
 }).
 
 -type model() :: #model{} | 'empty' | 'not_available'.

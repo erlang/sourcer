@@ -8,30 +8,46 @@
 -include("sourcer_db.hrl").
 
 merge_test_() ->
+    M =#model{defs=[{[a1],1},{[b1], 1}],
+                refs=[{[c1],1},{[d1], 1}]},
     [
         ?_assertEqual(
-            #model{defs=[{[a1],1},{[a2],1},{[b1],1},{[b2],1}],
-                refs=[{[c1],1},{[c2],1},{[d1],1},{[d2],1}],
-                info=[{[e1],1},{[e2],1},{[f1],1},{[f2],1}]},
+            M,
             sourcer_db:merge([
-                #model{defs=[{[a1],1},{[b1], 1}],
-                    refs=[{[c1],1},{[d1], 1}],
-                    info=[{[e1],1},{[f1],1}]},
-                #model{defs=[{[a2],1},{[b2],1}],
-                    refs=[{[c2],1},{[d2],1}],
-                    info=[{[e2],1},{[f2],1}]}])
+                M
+            ])
         ),
         ?_assertEqual(
-            #model{defs=[{[{a1}],1},{[{macro}],1},{[{macro}],2}],
-                refs=[{[c1],1},{[c1],2},{[d1],1},{[d2],1}],
-                info=[{[e1],1},{[e1],2},{[f1],1},{[f2],1}]},
+            M,
             sourcer_db:merge([
-                #model{defs=[{[{a1}],2},{[{macro}], 2}],
-                    refs=[{[c1],2},{[d1], 1}],
-                    info=[{[e1],2},{[f1],1}]},
-                #model{defs=[{[{a1}],1},{[{macro}],1}],
-                    refs=[{[c1],1},{[d2],1}],
-                    info=[{[e1],1},{[f2],1}]}])
+                #model{},
+                M
+            ])
+        ),
+        ?_assertEqual(
+            M,
+            sourcer_db:merge([
+                M,
+                #model{}
+            ])
+        ),
+        ?_assertEqual(
+            #model{defs=[{[a1],1},{[a2],1},{[b1],1},{[b2],1}],
+                refs=[{[c1],1},{[c2],1},{[d1],1},{[d2],1}]},
+            sourcer_db:merge([
+                #model{defs=[{[a1],1},{[b1], 1}],
+                    refs=[{[c1],1},{[d1], 1}]},
+                #model{defs=[{[a2],1},{[b2],1}],
+                    refs=[{[c2],1},{[d2],1}]}])
+        ),
+        ?_assertEqual(
+            #model{defs=[{[{a1}],1},{[{macro,1,1}],1},{[{macro,1,1}],2}],
+                refs=[{[c1],1},{[c1],2},{[d1],1},{[d2],1}]},
+            sourcer_db:merge([
+                #model{defs=[{[{a1}],2},{[{macro,1,1}], 2}],
+                    refs=[{[c1],2},{[d1], 1}]},
+                #model{defs=[{[{a1}],1},{[{macro,1,1}],1}],
+                    refs=[{[c1],1},{[d2],1}]}])
         ),
         ?_assertEqual(
             #model{},
@@ -40,7 +56,7 @@ merge_test_() ->
     ].
 
 persistence_test_() ->
-    F = "tmp/f",
+    F = "/tmp/f",
     [
         {foreach,
             fun() -> file:delete(F), ok end,
@@ -76,8 +92,8 @@ scan(D, P0) ->
     {ok, Ts, _} = sourcer_scan:string(D, P0),
     sourcer_scan:filter_ws_tokens(Ts).
 
-model({D, R, I, _}) ->
-    #model{refs=lists:sort(R), defs=lists:sort(D), info=lists:sort(I)};
-model({D, R, I}) ->
-    #model{refs=lists:sort(R), defs=lists:sort(D), info=lists:sort(I)}.
+model({D, R, _}) ->
+    #model{refs=lists:sort(R), defs=lists:sort(D)};
+model({D, R}) ->
+    #model{refs=lists:sort(R), defs=lists:sort(D)}.
 

@@ -19,7 +19,7 @@ assert(Exp, Val) ->
 
 parse_test_() ->
     {ok, Terms} = file:consult("apps/sourcer/test/parser_db_tests_data"),
-    [assert(Y, X) || {X,Y,_}<-(Terms)].
+    [assert(Y, X) || {X,Y,_}<-lists:reverse(Terms)].
 
 scan(D) ->
     {ok, Ts, _} = sourcer_scan:string(D),
