@@ -4,7 +4,9 @@
     load/1,
     save/2,
     merge/1,
-    analyse/1
+    analyse/1,
+    analyse_text/1,
+    get_element_at_pos/2
 ]).
 
 -include("sourcer_db.hrl").
@@ -137,9 +139,22 @@ join_ctx(Ctx1, Ctx2) ->
 
 %%%%%%%%%%%%%%%%%%%%
 
+analyse_text(Text) ->
+    TText = unicode:characters_to_list(Text),
+    {ok, Toks, _} = sourcer_scan:string(TText),
+    Forms = sourcer_parse:parse(Toks),
+    sourcer_db:analyse(Forms).
+
+get_element_at_pos(Model, Pos) ->
+    #model{defs=Defs, refs=Refs} = Model,
+    Defs1 = lists:filter(fun({_,_,X,_})-> pos_between(Pos, X) end, Defs),
+    Defs2 = lists:filter(fun({_,X,_,_})-> pos_between(Pos, X) end, Defs),
+    Refs1 = lists:filter(fun({_,X})-> pos_between(Pos, X) end, Refs),
+    {Defs1, Refs1++Defs2}.
+
 analyse(Forms) ->
     M = merge([analyse_form(X) || X<-Forms]),
-    adjust_keys(M).
+    post_process(M).
 
 analyse_form({define, Name, Arity, Args, Value, Comments, Pos, FullRange}) ->
     Key = [{macro, Name, Arity}],
@@ -259,10 +274,15 @@ analyse_exprs([{var,_,_,Name}=H|T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     NewDefs = [{Key, range(H), none, #{}}|Defs],
     NewRefs = [{Key, range(H)}|Refs],
     analyse_exprs(T, Ctx, Model#model{defs=NewDefs, refs=NewRefs});
+analyse_exprs([{macro,_,Name,none}=H|T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
+    Key = [{macro, macro_name(Name), -1}],
+    NewRefs = [{Key, range(H)}|Refs],
+    analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
 analyse_exprs([{macro,_,Name,Args}=H|T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     Key = [{macro, macro_name(Name), macro_arity(Args)}],
     NewRefs = [{Key, range(H)}|Refs],
-    analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
+    merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}) |
+        [analyse_exprs(A, Ctx, Model) || A<-Args]]);
 analyse_exprs([{call, ?v(Name)=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
     Arity = length(Args),
     case has_type(Ctx) of
@@ -275,7 +295,8 @@ analyse_exprs([{call, ?v(Name)=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
         false ->
             Key = [{function, Name, Arity}],
             NewRefs = [{Key, range(F)}|Refs],
-            analyse_exprs(T, Ctx, Model#model{refs=NewRefs})
+            merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}) |
+                [analyse_exprs(A, Ctx, Model) || A<-Args]])
     end;
 analyse_exprs([{call, ?v(Mod)=M, ?v(Fun)=F, Args} | T], Ctx, Model=#model{refs=Refs}) ->
     Arity = length(Args),
@@ -289,7 +310,8 @@ analyse_exprs([{call, ?v(Mod)=M, ?v(Fun)=F, Args} | T], Ctx, Model=#model{refs=R
         false ->
             Key = [{module, Mod}, {function, Fun, Arity}],
             NewRefs = [{Key, range(F)}|Refs],
-            analyse_exprs(T, Ctx, Model#model{refs=NewRefs})
+            merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}) |
+                [analyse_exprs(A, Ctx, Model) || A<-Args]])
     end;
 analyse_exprs([{funref, ?v(Mod)=M, ?v(Fun)=F, ?v(A)} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     Key = [{module, Mod}, {function, Fun, A}],
@@ -305,10 +327,11 @@ analyse_exprs([{defun, FN, Args, Ix, Clauses, Pos} | T], Ctx, Model=#model{defs=
     NewDefs = [{Key, Pos}|Defs],
     merge([analyse_exprs(T, Ctx, Model#model{defs=NewDefs}) |
             [analyse_clause(C, NewCtx) || C<-Clauses]]);
-analyse_exprs([{record, ?v(N)=R, F} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
+analyse_exprs([{record, ?v(N)=R, Fs} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     Key = [{record, N}],
     NewRefs = [{Key, range(R)}|Refs],
-    analyse_exprs(T, Ctx, Model#model{refs=NewRefs});
+    merge([analyse_exprs(T, Ctx, Model#model{refs=NewRefs}),
+        analyse_fields(Fs, Ctx)]);
 analyse_exprs([{recfield, ?v(RN)=R, ?v(FN)=F} | T], Ctx, Model=#model{defs=Defs, refs=Refs}) ->
     KeyR = [{record, RN}],
     KeyF = [{record, RN},{field, FN}],
@@ -412,6 +435,9 @@ macro_name("?"++Name) ->
 macro_name(X) ->
     X.
 
+post_process(M) ->
+    adjust_keys(M).
+
 adjust_keys(M=#model{defs=D, refs=R}) ->
     Fun = fun({[{module,_}],_,_,_})->false; (_)->true end,
     L = lists:dropwhile(Fun, D),
@@ -436,3 +462,9 @@ fix_key(E, K) ->
         _ ->
             setelement(1, E, [K|KK])
     end.
+
+pos_between(_Crt, none) ->
+    false;
+pos_between(Crt, {Start, End}) ->
+    Start =< Crt andalso Crt < End.
+

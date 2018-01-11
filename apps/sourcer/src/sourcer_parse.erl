@@ -243,8 +243,8 @@ parse_expr([?k('#'), ?k(atom)=R, ?k(?LCURL)=B | T]) ->
 parse_expr([_|T]) ->
     parse_expr(T).
 
-parse_field([?k(atom)=F, ?k('=')|T]) ->
-    {F, parse_expr(T)}.
+parse_field([{atom,_,_,FN}=F, ?k('=')|T]) ->
+    {field, range(F), FN, [], parse_expr(T)}.
 
 predef_macros(Module, File) ->
     Machine = list_to_atom(erlang:system_info(machine)),
