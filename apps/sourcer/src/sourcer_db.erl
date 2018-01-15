@@ -159,7 +159,7 @@ analyse(Forms) ->
 analyse_form({define, Name, Arity, Args, Value, Comments, Pos, FullRange}) ->
     Key = [{macro, Name, Arity}],
     Ctx = new_ctx(Key),
-    Infos = case Comments of [] -> #{}; _-> #{comments=>Comments} end,
+    Infos = case Comments of none -> #{}; _-> #{comments=>Comments} end,
     Defs = [{Key, Pos, FullRange, Infos}],
     Model0 = #model{defs=Defs},
     Model1 = analyse_exprs_list(Args, Ctx, Model0),
@@ -201,7 +201,7 @@ analyse_form({spec, Name, Arity, Args, _Comments, Pos, FullRange}) ->
 analyse_form({type, Name, Arity, Args, Def, Comments, Pos, FullRange}) ->
     Key = [{type, Name, Arity}],
     Ctx = new_ctx(Key),
-    Infos = case Comments of [] -> #{}; _-> #{comments=>Comments} end,
+    Infos = case Comments of none -> #{}; _-> #{comments=>Comments} end,
     Defs = [{Key, Pos, FullRange, Infos}],
     Model0 = #model{defs=Defs},
     Model1 = merge([analyse_type(A, Ctx, Model0) || A<-Args]),
@@ -209,7 +209,7 @@ analyse_form({type, Name, Arity, Args, Def, Comments, Pos, FullRange}) ->
     Model2;
 analyse_form({module, Name, Comments, Pos}) ->
     Key = [{module, Name}],
-    Infos = case Comments of [] -> #{}; _-> #{comments=>Comments} end,
+    Infos = case Comments of none -> #{}; _-> #{comments=>Comments} end,
     Defs = [{Key, Pos, none, Infos}],
     #model{defs=Defs};
 analyse_form({import, Module, Funcs, _Comments}) ->
@@ -219,7 +219,7 @@ analyse_form({import, Module, Funcs, _Comments}) ->
 analyse_form({record, Name, Comments, Pos, Fields, FullRange}) ->
     Key = [{record, Name}],
     Ctx = new_ctx(Key),
-    Infos = case Comments of [] -> #{}; _-> #{comments=>Comments} end,
+    Infos = case Comments of none -> #{}; _-> #{comments=>Comments} end,
     Defs = [{Key, Pos, FullRange, Infos}],
     Model0 = #model{defs=Defs},
     Model1 = analyse_fields(Fields, Ctx),
@@ -227,7 +227,7 @@ analyse_form({record, Name, Comments, Pos, Fields, FullRange}) ->
 analyse_form({function, Name, Arity, Clauses, Comments, Pos, FullRange}) ->
     Key = [{function, Name, Arity}],
     Ctx = new_ctx(Key),
-    Infos = case Comments of [] -> #{}; _-> #{comments=>Comments} end,
+    Infos = case Comments of none -> #{}; _-> #{comments=>Comments} end,
     Defs = [{Key, Pos, FullRange, Infos}],
     Model0 = #model{defs=Defs},
     merge([Model0 | [analyse_clause(C,Ctx) || C<-Clauses]]);

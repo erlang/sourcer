@@ -6,15 +6,18 @@
 
 extract_top_comments_test_() ->
     [
-     ?_assertMatch({[<<"a">>,<<"b">>,<<"c">>],
+     ?_assertMatch({none,
                   [{atom,_,"hello",hello}]},
-            ?SUT:extract_top_comments(scan_ws("%a\n%b\n  %%c\nhello"))),
-     ?_assertMatch({[<<"a">>],
+            ?SUT:extract_top_comments(scan_ws("\nhello"))),
+     ?_assertMatch({{{0,1},{2,8}},
                   [{atom,_,"hello",hello}]},
-            ?SUT:extract_top_comments(scan_ws("%a\n   \n\nhello"))),
-     ?_assertMatch({[<<"c">>],
+            ?SUT:extract_top_comments(scan_ws("%a\n%bc\n  %%cde\nhello"))),
+     ?_assertMatch({{{0,1},{0,6}},
                   [{atom,_,"hello",hello}]},
-            ?SUT:extract_top_comments(scan_ws("%a\n%b\n\n\n%%c\nhello")))
+            ?SUT:extract_top_comments(scan_ws("%afgg\n   \n\nhello"))),
+     ?_assertMatch({{{4,1},{4,7}},
+                  [{atom,_,"hello",hello}]},
+            ?SUT:extract_top_comments(scan_ws("%12345\n%123\n\n\n%%1234\nhello")))
     ].
 
 take_until_token_test_() ->

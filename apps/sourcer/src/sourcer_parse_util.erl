@@ -63,10 +63,11 @@ skip_unrelated_comments([?k(white_space)=_C|Toks], Acc) ->
     skip_unrelated_comments(Toks, Acc).
 
 compact_comments([]) ->
-    [];
+    none;
 compact_comments(L) ->
-    Text = [[unicode:characters_to_binary(string:trim(skip_percent(C), trailing))] || {comment,_,_,C}<-L],
-    lists:append(Text).
+    {_,P1,_,_} = hd(L),
+    {_,{L2,C2},T,_} = lists:last(L),
+    {P1, {L2,C2+length(T)}}.
 
 %% split list at the first occurence of delimiter;
 %% if delimiter not found, return whole list as result.
