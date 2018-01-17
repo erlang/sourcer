@@ -4,16 +4,21 @@
 -module(sourcer_indent).
 
 -export([
-         indent_line/7,
-         indent_lines/7,
-         template_indent_lines/6
+%%         indent_line/4,
+         lines/1,
+         lines/2
         ]).
 
-%% 
-%% -define(DEBUG, 1).
+%%
+%%-define(DEBUG, 1).
 
 -include("debug.hrl").
--include("include/sourcer_token.hrl").
+%-include("include/sourcer_token.hrl").
+
+-define(k(X), {X,_,_,_}).
+-define(kv(K,V), {K,_,_,V}).
+-define(line(X), {_,{X,_},_,_}).
+-define(col(X), {_,{_,X},_,_}).
 
 %% TODO: change into multiples of IndentW
 default_indent_prefs() ->
@@ -32,82 +37,33 @@ default_indent_prefs() ->
      {fun_body, 5},
      {paren, 1},
      {'<<', 2},
-     {end_paren, 0}].
+     {end_paren, 0},
+     {comment_3, 0},
+     {comment_2, 0},
+     {comment_1, 48},
+
+     {indentW, 4},
+     {use_tabs, false},
+     {tab_len, 8}
+    ].
 
 %%
 %% API Functions
+
+lines(S) ->
+    lines(S, []).
+
+lines(S, Prefs) ->
+    Tokens = sourcer_scan:tokens(S),
+    Lines = array:from_list(split_lines(S)),
+    Ls = do_indent_lines(0, Tokens, Lines, get_prefs(Prefs)),
+    unicode:characters_to_list(array:to_list(Ls)).
+
 %%
-indent_line(St, OldLine, CommandText, IndentW, Tablength, UseTabs, Prefs) ->
-    indent_line(St, OldLine, CommandText, -1, IndentW, Tablength, UseTabs, get_prefs(Prefs)).
+%% Local Functions
+%%
 
-indent_line(St, OldLine, CommandText, N, _IndentW, Tablength, UseTabs, Prefs) ->
-    ?D(St),
-    S = sourcer_text:detab(St, Tablength, all),
-    StrippedCommandText = sourcer_text:left_strip(CommandText),
-    {Indent, AddNL} = check_add_newline(StrippedCommandText, Prefs),
-    case Indent of
-        true ->
-            case scan(S ++ StrippedCommandText) of
-                {ok, T} ->
-                    LineOffsets = sourcer_text:get_line_offsets(S),
-                    Tr = T ++
-                             [#token{kind=eof, line=size(LineOffsets)+1}],
-                    LineN = case N of
-                                -1 ->
-                                    size(LineOffsets)+1;
-                                _ ->
-                                    N
-                            end,
-                    ?D({indent_line, OldLine}),
-                    case indent(Tr, LineOffsets, LineN, Prefs, sourcer_text:left_strip(OldLine)) of
-                        {I, true} ->
-                            ?D(I),
-                            IS0 = reindent_line("", I),
-                            IS = entab(IS0, UseTabs, Tablength),
-                            {IS, sourcer_text:initial_whitespace(OldLine), AddNL};
-                        {I, false} ->
-                            ?D(I),
-                            case AddNL of
-                                false ->
-                                    IS0 = reindent_line("", I),
-                                    IS =  entab(IS0, UseTabs, Tablength),
-                                    {IS, 0, false};
-                                true -> {"", 0, false}
-                            end
-                    end;
-                Error  ->
-                    Error
-            end;
-        false ->
-            ok
-    end.
-
-entab(S, false, _Tablength) ->
-    S;
-entab(S, true, Tablength) ->
-    sourcer_text:entab(S, Tablength, left).
-
-get_key(",") -> comma_nl;
-get_key(',') -> comma_nl;
-get_key(";") -> semicolon_nl;
-get_key(';') -> semicolon_nl;
-get_key(".") -> dot_nl;
-get_key('.') -> dot_nl;
-get_key(">") -> arrow_nl;
-get_key('->') -> arrow_nl;
-get_key(_) -> none.
-
-check_add_newline(S, _Prefs) when S == "\r\n"; S == "\n"; S == "\r"; S == "" ->
-    {true, false};
-check_add_newline(S, Prefs) ->
-    case proplists:get_value(get_key(S), Prefs) of
-        1 ->
-            {true, true};
-        _ ->
-            {false, false}
-    end.
-
--record(i, {anchor, indent_line, current, in_block, prefs, old_line}).
+-record(i, {anchor, indent_line, current, in_block, prefs}).
 
 get_prefs([], OldP, Acc) ->
     Acc ++ OldP;
@@ -118,11 +74,28 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
 get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
+do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
+    case fetch_form(LineNr, Tokens0) of
+        eof -> Lines0;
+        {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
+            ToCol = indent(LineNr, FormTokens, Prefs),
+            L = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
+            Lines = array:set(LineNr, L, Lines0),
+            case LastLoc of
+                {LineNr, _} ->
+                    do_indent_lines(LineNr+1, Tokens, Lines, Prefs);
+                _ ->
+                    ReScan = rescan_form(Form, Lines),
+                    do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs)
+            end
+    end.
+
 %% TODO: value 4 is hardcoded! Should use indentation width here
 
-indent(Tokens, LineOffsets, LineN, Prefs, OldLine) ->
-    I = #i{anchor=hd(Tokens), indent_line=LineN, current=0, prefs=Prefs,
-           in_block=true, old_line=OldLine},
+indent(LineN, Tokens, Prefs) ->
+    A0 = {start,{-1,1},"",undefined},
+    I = #i{anchor=A0, indent_line=LineN, current=0, prefs=Prefs,
+           in_block=true},
     try
         i_form_list(Tokens, I),
         ?D(no_catch),
@@ -130,78 +103,99 @@ indent(Tokens, LineOffsets, LineN, Prefs, OldLine) ->
     catch
         throw:{indent, A, C, Inblock} ->
             ?D({indent, A, C, Inblock}),
-            {get_indent_of(A, C, LineOffsets), Inblock};
+            {get_indent_of(A, C), Inblock};
         throw:{indent_eof, A, C, Inblock} ->
             ?D({indent_eof, A, C, Inblock}),
-            {get_indent_of(A, C, LineOffsets), Inblock};
+            {get_indent_of(A, C), Inblock};
         throw:{indent_to, N, Inblock} ->
             ?D(N),
             {N, Inblock};
         error:_E ->
             ?D(_E),
+            io:format("~p:~p: ~P ~p~n",[?MODULE, ?LINE, _E, 20, erlang:get_stacktrace()]),
             {0, true}
     end.
 
-get_indent_of(_A = #token{kind=eof}, C, _LineOffsets) ->
+get_indent_of({_,eof,_,_}, C) ->
     C;
-get_indent_of(_A = #token{line=N, offset=O}, C, LineOffsets) ->
-    LO = element(N+1, LineOffsets),
-    TI = O - LO,
-    ?D({O, LO, C, _A}),
-    TI+C.
+get_indent_of({_, {_L, CA}, _, _}=_A, C) ->
+    ?D({CA, C, _A}),
+    CA+C-1.
 
-indent_lines(S, From, Length, IndentW, Tablength, UseTabs, Prefs) ->
-    {First, FirstLineNum, Lines} = sourcer_text:get_text_and_lines(S, From, Length),
-    do_indent_lines(Lines, IndentW, Tablength, UseTabs, First, get_prefs(Prefs), FirstLineNum, "").
+split_lines(Str) ->
+    split_lines(Str, []).
 
-template_indent_lines(Prefix, S, IndentW, Tablength, UseTabs, Prefs) ->
-    S0 = Prefix++S,
-    S1 = quote_template_variables(S0),
-    From = length(Prefix),
-    Length = length(S1) - From,
-    {First, FirstLineNum, Lines} = sourcer_text:get_text_and_lines(S1, From, Length),
-    S2 = do_indent_lines(Lines, IndentW, Tablength, UseTabs, First, get_prefs(Prefs), FirstLineNum, ""),
-    S3 = string:substr(S2, length(Prefix)+1, length(S2)-1),
-    unquote_template_variables(S3).
+split_lines([$$, C| Rest], Line) ->
+    split_lines(Rest, [C, $$|Line]);
+split_lines("\r\n" ++ Rest, Line) ->
+    [lists:reverse(Line, "\r\n")|split_lines(Rest,[])];
+split_lines("\n" ++ Rest, Line) ->
+    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
+split_lines([C|Rest], Line) ->
+    split_lines(Rest, [C|Line]);
+split_lines([], Line) ->
+    [lists:reverse(Line)].
+
+fetch_form(Line, [{_, _, {End, _}}=Form|Rest])
+  when Line =< End ->
+    {Form, Rest};
+fetch_form(Line, [_|Rest]) ->
+    fetch_form(Line, Rest);
+fetch_form(_, []) ->
+    eof.
+
+%% rescan after indentation so we get the new locations on the tokens
+rescan_form({_, {FromLine, _}=Loc, {LastLine,_}}, Lines) ->
+    Src = fetch_lines(Lines, LastLine, FromLine, []),
+    pick_form(sourcer_scan:tokens(Src, Loc, LastLine), FromLine, LastLine).
+
+%% pick the form we re-scanned most often the first but if form starts on
+%% previous lines form it can be wrong, most often a comment after dot
+pick_form([{_, {FromLine, _}, {LastLine, _}}=Form|_], FromLine, LastLine) ->
+    Form;
+pick_form([_|T], FromLine, LastLine) ->
+    pick_form(T, FromLine, LastLine).
+
+fetch_lines(Lines, NextLine, First, Acc)
+  when NextLine >= First ->
+    Src = array:get(NextLine, Lines) ++ Acc,
+    fetch_lines(Lines, NextLine-1, First, Src);
+fetch_lines(_Lines, _NextLine, _First, Acc) ->
+    Acc.
 
 %%
-%% Local Functions
-%%
+reindent_line(Line, N, Prefs) ->
+    L = reindent_line(Line, N),
+    entab(L, proplists:get_value(use_tabs, Prefs), proplists:get_value(tab_len, Prefs)).
 
-do_indent_lines([], _, _, _, _, _, _, A) ->
-    A;
-do_indent_lines([Line | Rest], IndentW, Tablength, UseTabs, Text, Prefs, N, Acc) ->
-    {NewI, _OldI, _AddNL} = indent_line(Text ++ Line, Line, "", N, IndentW, Tablength, UseTabs, Prefs),
-    ?D({do_indent_lines, Text++Line, NewI, N}),
-    NewLine = case NewI of
-                  error ->
-                      Line;
-                  _ ->
-                      NewLine0 = reindent_line(Line, NewI),
-                      entab(NewLine0, UseTabs, Tablength)
-              end,
-    do_indent_lines(Rest, IndentW, Tablength, UseTabs, Text ++ NewLine, Prefs, N+1, Acc++NewLine).
-
-
-%%
 reindent_line(" " ++ S, I) ->
     reindent_line(S, I);
 reindent_line("\t" ++ S, I) ->
     reindent_line(S, I);
 reindent_line(S, I) when is_integer(I), I>0 ->
-    lists:duplicate(I, $ )++S;
+    lists:duplicate(I, $ ) ++ S;
 reindent_line(S, I) when is_integer(I) ->
+    S.
+
+entab(S, false, _Tablength) ->
     S;
-reindent_line(S, I) when is_list(I) ->
-    I ++ S.
+entab(S, true, Tablength) when Tablength < 2->
+    S;
+entab(S, true, Tablength) ->
+    {Spaces, Line} = string:take(S, "\s\t"),
+    N = lists:foldl(fun($\s, N) -> N+1; ($\t, N) -> N+Tablength end, 0, Spaces),
+    lists:append([lists:duplicate($\t, N div Tablength),
+                  lists:duplicate($\s, N rem Tablength), Line]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-i_check_aux([#token{line=K} | _], #i{indent_line=L, anchor=A, current=C, in_block=Inblock}) when K >= L ->
+i_check_aux([?line(L)| _],
+            #i{indent_line=IL, anchor=A, current=C, in_block=Inblock})
+  when L >= IL ->
     {indent, A, C, Inblock};
-i_check_aux([eof | _], #i{anchor=A, current=C, in_block=Inblock}) ->
+i_check_aux([?k(eof) | _], #i{anchor=A, current=C, in_block=Inblock}) ->
     {indent_eof, A, C, Inblock};
-i_check_aux([#token{kind=eof} | _], #i{anchor=A, current=C, in_block=Inblock}) ->
+i_check_aux([eof | _], #i{anchor=A, current=C, in_block=Inblock}) ->
     {indent_eof, A, C, Inblock};
 i_check_aux([], I) ->
     i_check_aux([eof], I);
@@ -213,7 +207,7 @@ i_check(T, I) ->
         not_yet ->
             not_yet;
         Throw ->
-            ?D({T, I}),
+            ?D({T, I#i{prefs=[]}}),
             throw(Throw)
     end.
 
@@ -442,43 +436,43 @@ i_end_or_expr_list(R, I0) ->
             i_expr_list(R, I1)
     end.
 
-i_1_expr([#token{kind=atom} | _] = R, I) ->
+i_1_expr([?k(atom) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=integer}, #token{kind=dot} | _] = R, I) ->
+i_1_expr([?k(integer), ?k(dot) | _] = R, I) ->
     i_two(R, I);
-i_1_expr([#token{kind=integer} | _] = R, I) ->
+i_1_expr([?k(integer) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=string} | _] = R, I) ->
+i_1_expr([?k(string) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=macro} | _] = R, I) ->
+i_1_expr([?k(macro) | _] = R, I) ->
     i_macro(R, I);
-i_1_expr([#token{kind=float} | _] = R, I) ->
+i_1_expr([?k(float) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=var} | _] = R, I) ->
+i_1_expr([?k(var) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=char} | _] = R, I) ->
+i_1_expr([?k(char) | _] = R, I) ->
     i_one(R, I);
-i_1_expr([#token{kind=Kind} | _] = R0, I0) when Kind=='{'; Kind=='['; Kind=='(' ->
+i_1_expr([?k(Kind) | _] = R0, I0) when Kind=='{'; Kind=='['; Kind=='(' ->
     R1 = i_kind(Kind, R0, I0),
     I1 = i_with(paren, R0, I0),
     R2 = i_end_paren_or_expr_list(R1, I1#i{in_block=false}),
     I2 = i_with(end_paren, R0, I0),
     i_end_paren(R2, I2);
-i_1_expr([#token{kind='<<'} | _] = R0, I0) ->
+i_1_expr([?k('<<') | _] = R0, I0) ->
     R1 = i_kind('<<', R0, I0),
     I1 = i_with('<<', R0, I0),
     R2 = i_binary_expr_list(R1, I1#i{in_block=false}),
     I2 = i_with(end_paren, R0, I0),
     i_kind('>>', R2, I2);
-i_1_expr([#token{kind='#'} | _] = L, I) ->
+i_1_expr([?k('#') | _] = L, I) ->
     ?D('#'),
     {R, _A} = i_record(L, I#i{in_block=false}),
     R;
-i_1_expr([#token{kind='case'} | _] = R, I) ->
+i_1_expr([?k('case') | _] = R, I) ->
     i_case(R, I);
-i_1_expr([#token{kind='if'} | _] = R, I) ->
+i_1_expr([?k('if') | _] = R, I) ->
     i_if(R, I);
-i_1_expr([#token{kind='begin'} | _] = R0, I0) ->
+i_1_expr([?k('begin') | _] = R0, I0) ->
     R1 = i_kind('begin', R0, I0),
     I1 = i_with('case', R0, I0),
     R2 = i_end_or_expr_list(R1, I1#i{in_block=false}),
@@ -487,9 +481,9 @@ i_1_expr([#token{kind='begin'} | _] = R0, I0) ->
 %%     I1 = i_with('case', R0, I0),
 %%     R2 = i_end_or_expr_list(R1, I1#i{in_block=false}),
 %%     i_block_end(T#token.kind, R2, I0);
-i_1_expr([#token{kind='receive'} | _] = R, I) ->
+i_1_expr([?k('receive') | _] = R, I) ->
     i_receive(R, I);
-i_1_expr([#token{kind='fun'}=T | R0], I) ->
+i_1_expr([?k('fun')=T | R0], I) ->
     I1 = i_with('fun', T, I),
     case i_sniff(R0) of
         '(' ->
@@ -508,7 +502,7 @@ i_1_expr([#token{kind='fun'}=T | R0], I) ->
             {R1, _A} = i_expr(R0, I1, none),
             R1
     end;
-i_1_expr([#token{kind='try'} | _] = R, I) ->
+i_1_expr([?k('try') | _] = R, I) ->
     ?D(R),
     i_try(R, I);
 i_1_expr(R0, I) ->
@@ -619,15 +613,20 @@ i_try(R0, I0) ->
 
 is_binary_op([T | _]) ->
     is_binary_op(T);
-is_binary_op(#token{kind=Kind}) ->
-    sourcer_text:is_op2(Kind);
-is_binary_op(Kind) ->
-    sourcer_text:is_op2(Kind).
+is_binary_op(?k(Kind)) ->
+    is_binary_op(Kind);
+is_binary_op(Op) ->
+    lists:member(Op, ['andalso', 'orelse', 'div', 'rem',
+                      'band', 'and', 'bor', 'bxor', 'bsl',
+                      'bsr', 'or', 'xor', '<-', '=', '==', '/=',
+                      '<', '>', '=<', '>=',
+                      '=/=', '=:=', ':', '+', '-', '*', '/', '!',
+                      '++', '--', '.', '#', '|', '::']).
 
 is_unary_op([T | _]) ->
     is_unary_op(T);
-is_unary_op(#token{kind=Kind}) ->
-    sourcer_text:is_op1(Kind).
+is_unary_op(?k(Op)) ->
+    lists:member(Op, ['not', '-', '?', 'catch']).
 
 i_block_end(_Begin, R0, R1, I0) ->
     I1 = i_with(end_paren, R0, I0),
@@ -651,7 +650,7 @@ i_parameters(R, I) ->
             i_expr_list(R, I#i{in_block=false})
     end.
 
-i_record([#token{kind='#'} | R0], I0) ->
+i_record([?k('#') | R0], I0) ->
     I = I0#i{in_block=false},
     R1 = i_comments(R0, I),
     ?D(R1),
@@ -680,27 +679,26 @@ i_record([#token{kind='#'} | R0], I0) ->
             {R2, hd(R1)}
     end.
 
-comment_kind("%%%" ++ _) ->
+comment_kind(?kv(comment, "%%%"++_)) ->
     comment_3;
-comment_kind("%%" ++ _) ->
+comment_kind(?kv(comment, "%%"++_)) ->
     comment_2;
-comment_kind("%" ++ _) ->
+comment_kind(?kv(comment, "%"++_)) ->
     comment_1;
-comment_kind(_) ->
-    comment_0.
+comment_kind(C) ->
+    error({badarg, C}).
 
-i_comments([#token{kind=comment, value=V} = C | Rest], I) ->
-    case comment_kind(V) of
+i_comments([?k(white_space) | Rest], I) ->
+    %% scanner add white_space
+    i_comments(Rest, I);
+i_comments([?k(comment) = C | Rest], I) ->
+    case comment_kind(C) of
+        comment_1 ->
+            i_check([C], i_with(comment_1, C, I));
+        comment_2 ->  %% context dependent
+            i_check([C], I);
         comment_3 ->
-            case i_check_aux([C], I) of
-                not_yet ->
-                    not_yet;
-                _ ->
-                    ?D(I),
-                    throw({indent_to, 0, I#i.in_block})
-            end;
-        _ ->
-            i_check([C], I)
+            i_check([C], i_with(comment_3, C, I))
     end,
     i_comments(Rest, I);
 i_comments(Rest, I) ->
@@ -709,7 +707,9 @@ i_comments(Rest, I) ->
 
 skip_comments([]) ->
     [];
-skip_comments([#token{kind=comment} | Rest]) ->
+skip_comments([?k(comment) | Rest]) ->
+    skip_comments(Rest);
+skip_comments([?k(white_space) | Rest]) -> %% scanner add white_space
     skip_comments(Rest);
 skip_comments(Rest) ->
     Rest.
@@ -725,14 +725,14 @@ i_atom_or_macro(R0, I) ->
 
 i_kind(Kind, R0, I) ->
     R1 = i_comments(R0, I),
-    [#token{kind=Kind} | R2] = R1,
+    [?k(Kind) | R2] = R1,
     R2.
 
 i_end_paren(R0, I) ->
     R1 = i_comments(R0, I),
     i_end_paren_1(R1, I).
 
-i_end_paren_1([#token{kind=Kind} | _] = R, I) when Kind==')'; Kind=='}'; Kind==']'; Kind=='>>'; Kind==eof ->
+i_end_paren_1([?k(Kind) | _] = R, I) when Kind==')'; Kind=='}'; Kind==']'; Kind=='>>'; Kind==eof ->
     i_kind(Kind, R, I).
 
 i_form_list(R0, I) ->
@@ -761,10 +761,10 @@ i_declaration(R0, I) ->
     i_check(R0, I),
     R1 = i_kind('-', R0, I),
     case skip_comments(R1) of
-        [#token{kind=atom, value='spec'} | _] ->
+        [?kv(atom, 'spec') | _] ->
             R2 = i_kind(atom, R1, I),
             i_spec(R2, I);
-        [#token{kind=atom, value='type'} | _] ->
+        [?kv(atom, 'type') | _] ->
             R2 = i_kind(atom, R1, I),
             i_type(R2, I);
         _ ->
@@ -956,40 +956,14 @@ i_sniff(L) ->
     case skip_comments(L) of
         [] ->
             eof;
-        [#token{kind=Kind} | _] ->
+        [?k(Kind) | _] ->
             Kind
     end.
 
-scan(S) ->
-    case sourcer_scan:string(S, {0, 1}, [return_comments]) of
-        {ok, T, _} ->
-            {ok, T};
-        Error ->
-            Error
-    end.
-
-quote_template_variables(S) ->
-    quote_template_variables(S, false, []).
-
-quote_template_variables([], true, Acc) ->
-    lists:reverse(Acc, "'");
-quote_template_variables([], false, Acc) ->
-    lists:reverse(Acc);
-quote_template_variables("${" ++ Rest, _, Acc) ->
-    quote_template_variables(Rest, true, "{$'"++Acc);
-quote_template_variables("}"++Rest, true, Acc) ->
-    quote_template_variables(Rest, false, "'}"++Acc);
-quote_template_variables([C | Rest], V, Acc) ->
-    quote_template_variables(Rest, V, [C | Acc]).
-
-unquote_template_variables(S) ->
-    unquote_template_variables(S, []).
-
-unquote_template_variables([], Acc) ->
-    lists:reverse(Acc);
-unquote_template_variables("'${"++Rest, Acc) ->
-    unquote_template_variables(Rest, "{$"++Acc);
-unquote_template_variables("}'"++Rest, Acc) ->
-    unquote_template_variables(Rest, "}"++Acc);
-unquote_template_variables([C | Rest], Acc) ->
-    unquote_template_variables(Rest, [C | Acc]).
+%% scan(S) ->
+%%     case sourcer_scan:tokens(S) of
+%%         {ok, T, _} ->
+%%             {ok, T};
+%%         Error ->
+%%             Error
+%%     end.

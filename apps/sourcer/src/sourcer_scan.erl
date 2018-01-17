@@ -4,9 +4,8 @@
 -include("debug.hrl").
 
 -export([line_info/1,
-         string/1,
-         string/2,
-         string/3,
+         string/1, string/2, string/3,
+         tokens/1, tokens/3,
          filter_ws_tokens/1,
          filter_comment_tokens/1,
          filter_ws_comment_tokens/1,
@@ -87,6 +86,33 @@ string2(String, {L, C}, Opts) ->
             {ok, Result, {L1, C1}};
         Err ->
             Err
+    end.
+
+tokens(Str) ->
+    tokens_1([], Str, {0, 1}, all).
+
+tokens(Str, Loc, Last) ->
+    tokens_1([], Str, Loc, Last).
+
+%% Scans Str after tokens until line
+tokens_1(Cont, Str, {_,_}=Start, Last) ->
+    case erl_scan:tokens(Cont, Str, Start, [return_comments, text]) of
+        {done, {ok, Tokens0, {Next,_} = EndLoc}, Rest} when Next < Last ->
+            Tokens = convert_tokens(Tokens0),
+            {_, LastLoc, _, _} = lists:last(Tokens),
+            [{Tokens, Start, LastLoc} | tokens_1([], Rest, EndLoc, Last)];
+        {done, {ok, Tokens0, _EndLoc}, _Rest} ->
+            Tokens = convert_tokens(Tokens0),
+            {_, LastLoc, _, _} = lists:last(Tokens),
+            [{Tokens, Start, LastLoc}];
+        {done, {eof, _EndLoc}, _Rest} ->
+            [];
+        {done, {error, Info, EndLoc}, Rest} ->
+            %% FIXME (investigate scanner errors)
+            io:format("Scanner Error: ~p~n",[Info]),
+            tokens_1([], Rest, EndLoc, Last);
+        {more, More} ->
+            tokens_1(More, eof, Start, Last)
     end.
 
 filter_tokens_by_kinds(Tokens, Kinds) ->
@@ -170,7 +196,7 @@ convert_tokens([{dot, Ann}=T0 | Rest], TokensAcc) ->
             T1 = {white_space, Ann6},
             convert_tokens(Rest, [convert_token(T1), convert_token(T) | TokensAcc])
     end;
-convert_tokens([{comment, Ann,_}=T | Rest], TokensAcc) ->
+convert_tokens([{comment, _Ann,_}=T | Rest], TokensAcc) ->
     {A,B,C,D} = convert_token(T),
     C0 = lists:reverse(C),
     C1 = case C0 of
