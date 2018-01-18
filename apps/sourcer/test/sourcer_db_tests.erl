@@ -32,21 +32,21 @@ merge_test_() ->
             ])
         ),
         ?_assertEqual(
-            #model{defs=[{[a1],1},{[a2],1},{[b1],1},{[b2],1}],
+            #model{defs=[{[a1],1,#{}},{[a2],1,#{}},{[b1],1,#{}},{[b2],1,#{}}],
                 refs=[{[c1],1},{[c2],1},{[d1],1},{[d2],1}]},
             sourcer_db:merge([
-                #model{defs=[{[a1],1},{[b1], 1}],
+                #model{defs=[{[a1],1,#{}},{[b1], 1,#{}}],
                     refs=[{[c1],1},{[d1], 1}]},
-                #model{defs=[{[a2],1},{[b2],1}],
+                #model{defs=[{[a2],1,#{}},{[b2],1,#{}}],
                     refs=[{[c2],1},{[d2],1}]}])
         ),
         ?_assertEqual(
-            #model{defs=[{[{a1}],1},{[{macro,1,1}],1},{[{macro,1,1}],2}],
+            #model{defs=[{[{a1}],1,#{}},{[{macro,1,1}],1,#{}},{[{macro,1,1}],2,#{}}],
                 refs=[{[c1],1},{[c1],2},{[d1],1},{[d2],1}]},
             sourcer_db:merge([
-                #model{defs=[{[{a1}],2},{[{macro,1,1}], 2}],
+                #model{defs=[{[{a1}],2,#{}},{[{macro,1,1}], 2,#{}}],
                     refs=[{[c1],2},{[d1], 1}]},
-                #model{defs=[{[{a1}],1},{[{macro,1,1}],1}],
+                #model{defs=[{[{a1}],1,#{}},{[{macro,1,1}],1,#{}}],
                     refs=[{[c1],1},{[d2],1}]}])
         ),
         ?_assertEqual(
@@ -85,35 +85,30 @@ quz(_) ->
     [
         ?_assertMatch({[{[{module,foo},{function,bar,0}],
                             {{2,1},{2,4}},
-                            {{2,1},{3,11}},
                             #{}}],
                         []},
                         sourcer_db:get_element_at_pos(Model, {3, 4})
                     ),
         ?_assertMatch({[{[{module,foo},{function,bar,0}],
                             {{2,1},{2,4}},
-                            {{2,1},{3,11}},
                             #{}}],
                         [{[{module,foo},{function,quz,1}],{{3,5},{3,8}}}]},
                         sourcer_db:get_element_at_pos(Model, {3, 5})
                     ),
         ?_assertMatch({[{[{module,foo},{function,bar,0}],
                             {{2,1},{2,4}},
-                            {{2,1},{3,11}},
                             #{}}],
                         [{[{module,foo},{function,quz,1}],{{3,5},{3,8}}}]},
                         sourcer_db:get_element_at_pos(Model, {3, 6})
                     ),
         ?_assertMatch({[{[{module,foo},{function,bar,0}],
                             {{2,1},{2,4}},
-                            {{2,1},{3,11}},
                             #{}}],
                         []},
                         sourcer_db:get_element_at_pos(Model, {3, 8})
                     ),
         ?_assertMatch({[{[{module,foo},{function,bar,0}],
                             {{2,1},{2,4}},
-                            {{2,1},{3,11}},
                             #{}}],
                         []},
                         sourcer_db:get_element_at_pos(Model, {3, 9})
@@ -123,13 +118,13 @@ quz(_) ->
 persist(F, S) ->
     {ok, Ts, _} = sourcer_scan:string(S),
     Fs = sourcer_parse:parse(sourcer_scan:filter_ws_tokens(Ts)),
-    E = sourcer_db:save(F, Fs),
-    A = sourcer_db:load(F),
+    E = sourcer_db:save_model(F, Fs),
+    A = sourcer_db:load_model(F),
     ?_assertEqual(E, A).
 
 assert(Exp, Val) ->
     Expected = model(Exp),
-    Value = sourcer_db:analyse(sourcer_parse:parse(scan(Val))),
+    Value = sourcer_db:analyse_text(Val),
     {Val, ?_assertEqual(Expected, Value)}.
 
 analyze_test_() ->
@@ -144,8 +139,28 @@ scan(D, P0) ->
     {ok, Ts, _} = sourcer_scan:string(D, P0),
     sourcer_scan:filter_ws_tokens(Ts).
 
-model({D, R, _}) ->
-    #model{refs=lists:sort(R), defs=lists:sort(D)};
 model({D, R}) ->
     #model{refs=lists:sort(R), defs=lists:sort(D)}.
+
+print_key_test_() ->
+    [
+        ?_assertEqual(<<"hej:">>, sourcer_db:print_key({module, hej})),
+        ?_assertEqual(<<"\"hej\"">>, sourcer_db:print_key({include, "hej"})),
+        ?_assertEqual(<<"\"hej\"">>, sourcer_db:print_key({include_lib, "hej"})),
+        ?_assertEqual(<<"hej/3">>, sourcer_db:print_key({function, hej, 3})),
+        ?_assertEqual(<<"@2">>, sourcer_db:print_key({clause, 2})),
+        ?_assertEqual(<<"hej">>, sourcer_db:print_key({var, 'hej'})),
+        ?_assertEqual(<<"'Hej'">>, sourcer_db:print_key({var, 'Hej'})),
+        ?_assertEqual(<<"#hej">>, sourcer_db:print_key({record, hej})),
+        ?_assertEqual(<<".hej">>, sourcer_db:print_key({field, hej})),
+        ?_assertEqual(<<"?hej/2">>, sourcer_db:print_key({macro, hej, 2})),
+        ?_assertEqual(<<"?hej">>, sourcer_db:print_key({macro, hej, -1})),
+        ?_assertEqual(<<"?Hej/0">>, sourcer_db:print_key({macro, 'Hej', 0})),
+        ?_assertEqual(<<"was()/3">>, sourcer_db:print_key({type, was, 3})),
+        ?_assertEqual(<<"hej:ff/2">>, sourcer_db:print_key([{module, hej},{function, ff, 2}])),
+        ?_assertEqual(<<"hej:">>, sourcer_db:print_key([{module, hej}])),
+        ?_assertEqual(<<"{asdd,hej}">>, sourcer_db:print_key([{asdd, hej}])),
+        ?_assertEqual(<<"">>, sourcer_db:print_key([]))
+    ].
+
 

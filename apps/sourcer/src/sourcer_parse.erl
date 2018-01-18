@@ -95,52 +95,52 @@ parse_attribute([{atom,_, _, 'define'}|Ts], FullRange, Comments) ->
                                 {none, -1, parse_expr(tl(Args0))}
                         end,
     {define, AName, Arity, Args, Value, Comments, range(Name), FullRange};
-parse_attribute([{atom,Pos,_,'record'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_,_,'record'}|Ts], FullRange, Comments) ->
     [{atom,_,_,Name}=N, ?k(',') | Def] = ?util:middle(Ts),
     {record, Name, Comments, range(N), parse_record(Def), FullRange};
-parse_attribute([{atom,Pos, _, 'type'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'type'}|Ts], FullRange, Comments) ->
     {type, {atom,_,_,Name}=N, Args, Def} = parse_type(Ts),
     {type, Name, length(Args), Args, Def, Comments, range(N), FullRange};
-parse_attribute([{atom,Pos, _, 'opaque'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'opaque'}|Ts], FullRange, Comments) ->
     {type, {atom,_,_,Name}=N, Args, Def} = parse_type(Ts),
     {type, Name, length(Args), Args, Def, Comments, range(N), FullRange};
-parse_attribute([{atom,Pos, _, 'spec'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'spec'}|Ts], FullRange, Comments) ->
     case parse_spec(Ts) of
         {{atom,_,_,F}=N, A, Sigs} ->
             {spec, F, A, Sigs, Comments, range(N), FullRange};
         {{atom,_,_,M}, {atom,_,_,F}=N, A, Sigs} ->
             {spec, M, F, A, Sigs, Comments, range(N), FullRange}
     end;
-parse_attribute([{atom,Pos, _, 'callback'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'callback'}|Ts], FullRange, Comments) ->
     case parse_spec(Ts) of
         {{atom,_,_,F}=N, A, Sigs} ->
             {callback, F, A, Sigs, Comments, range(N), FullRange};
         {{atom,_,_,M}, {atom,_,_,F}=N, A, Sigs} ->
             {callback, M, F, A, Sigs, Comments, range(N), FullRange}
     end;
-parse_attribute([{atom,_, _, 'export'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'export'}|Ts], _, Comments) ->
     Fs0 = ?util:split_at_token(?util:middle(?util:middle(Ts)), ','),
     Fs = [{F,A,range(P1,P2,T2)} || {[{atom,P1,_,F},_,{integer,P2,T2,A}],_} <- Fs0],
     {export, Fs, Comments};
-parse_attribute([{atom,_, _, 'export_type'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'export_type'}|Ts], _, Comments) ->
     Fs0 = ?util:split_at_token(?util:middle(?util:middle(Ts)), ','),
     Fs = [{F,A,range(P1,P2,T2)} || {[{atom,P1,_,F},_,{integer,P2,T2,A}],_} <- Fs0],
     {export_type, Fs, Comments};
-parse_attribute([{atom,Pos, _, 'import'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'import'}|Ts], _, Comments) ->
     Ts1 = ?util:middle(Ts),
     {[{atom,_,_,M}], _, Fs0} = ?util:take_until_token(Ts1, ','),
     Fs1 = ?util:split_at_token(?util:middle(Fs0), ','),
     Fs = [{F,A,range(P1,P2,T2)} || {[{atom,P1,_,F},_,{integer,P2,T2,A}],_} <- Fs1],
     {import, M, Fs, Comments};
-parse_attribute([{atom,_, _, 'module'}, ?k(?LPAR),{atom,_, _, Name}=N|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'module'}, ?k(?LPAR),{atom,_, _, Name}=N|_], _, Comments) ->
     {module, Name, Comments, range(N)};
-parse_attribute([{atom,Pos, _, 'compile'}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,Pos, _, 'compile'}|Ts], _, Comments) ->
     {compile, Pos, ?util:middle(Ts), Comments};
-parse_attribute([{atom,_, _, 'include'}, ?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'include'}, ?k(?LPAR),{string,_, _, Str}=S|_], _, Comments) ->
     {include, Str, Comments, range(S)};
-parse_attribute([{atom,_, _, 'include_lib'}, ?k(?LPAR),{string,_, _, Str}=S|_], FullRange, Comments) ->
+parse_attribute([{atom,_, _, 'include_lib'}, ?k(?LPAR),{string,_, _, Str}=S|_], _, Comments) ->
     {include_lib, Str, Comments, range(S)};
-parse_attribute([{atom,_, _, Name}|Ts], FullRange, Comments) ->
+parse_attribute([{atom,_, _, Name}|Ts], _, Comments) ->
     {attribute, Name, ?util:middle(Ts), Comments}.
 
 parse_record(Ts) ->
@@ -218,7 +218,7 @@ parse_expr([?k('fun'), ?k(atom)=F, ?k('/'), ?k(integer)=A | T]) ->
 parse_expr([?k(atom)=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, M, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([{macro,_,_,'?MODULE'}=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
+parse_expr([?k(macro)=M, ?k(':'), ?k(atom)=F, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{call, M, F, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
 parse_expr([?k(K)=F, ?k(?LPAR)=B|T]) when K==atom;K==var->
@@ -232,7 +232,7 @@ parse_expr([?k('fun')=F|T]) ->
 parse_expr([{macro,P,N,_}, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{macro, P, N, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([{macro,P,N,_} | T]) ->
+parse_expr([{macro,P,N,_}=M | T]) ->
     [{macro, P, N, none} | parse_expr(T)];
 parse_expr([?k('#'), ?k(atom)=R, ?k('.'), ?k(atom)=F | T]) ->
     [{recfield, R, F} | parse_expr(T)];

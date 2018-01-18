@@ -189,12 +189,12 @@ convert_tokens([{dot, Ann}=T0 | Rest], TokensAcc) ->
         _ ->
             Ann1 = erl_anno:set_text([hd(Txt)], Ann),
             T = {dot, Ann1},
-            Ann5 = erl_anno:set_text(tl(Txt), Ann),
-            L = erl_anno:line(Ann5),
-            C = erl_anno:column(Ann5),
-            Ann6 = erl_anno:set_location({L,C+1}, Ann5),
-            T1 = {white_space, Ann6},
-            convert_tokens(Rest, [convert_token(T1), convert_token(T) | TokensAcc])
+            %Ann5 = erl_anno:set_text(tl(Txt), Ann),
+            %L = erl_anno:line(Ann5),
+            %C = erl_anno:column(Ann5),
+            %Ann6 = erl_anno:set_location({L,C+1}, Ann5),
+            %T1 = {white_space, Ann6},
+            convert_tokens(Rest, [convert_token(T) | TokensAcc])
     end;
 convert_tokens([{comment, _Ann,_}=T | Rest], TokensAcc) ->
     {A,B,C,D} = convert_token(T),
@@ -214,7 +214,8 @@ convert_tokens([T | Rest], TokensAcc) ->
     convert_tokens(Rest, [convert_token(T) | TokensAcc]).
 
 make_macro(Anno, Txt) ->
-    V = list_to_atom(Txt),
+    V0 = case Txt of [$?, $? | T] -> T; [$? | T] -> T; _ -> Txt end,
+    V =  list_to_atom(V0),
     Anno1 = erl_anno:set_text(Txt, Anno),
     {macro, Anno1, V}.
 

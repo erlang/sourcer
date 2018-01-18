@@ -43,7 +43,10 @@
 
 -type model() :: #model{} | 'empty' | 'not_available'.
 
--type db() :: #{uri() => model()}.
+-type db() :: {
+        Models :: dict:dict(uri(), model()),
+        Modules :: #{atom()=>uri()}
+    }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
