@@ -312,6 +312,10 @@ i_expr_rest(R0, I, A) ->
             {R2, A};
         '|' -> %% List
             {R0, A};
+        '::' -> %% type
+            R1 = i_kind('::', R0, I),
+            {R2, _A} = i_type(R1, I, none),
+            {R2, A};
         _ ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
@@ -406,6 +410,9 @@ i_binary_specifiers(R0, I) ->
     case i_sniff(R1) of
         Kind when Kind==':'; Kind=='-'; Kind=='/' ->
             R2 = i_kind(Kind, R1, I),
+            i_binary_specifiers(R2, I);
+        '*' -> %% Allowed in typespecs
+            R2 = i_kind('*', R1, I),
             i_binary_specifiers(R2, I);
         _ ->
             ?D(R1),
@@ -526,6 +533,8 @@ i_1_expr([?k('fun')=T | R0], I) ->
 i_1_expr([?k('try') | _] = R, I) ->
     ?D(R),
     i_try(R, I);
+i_1_expr([?k('...') | _] = R, I) ->
+    i_one(R, I);
 i_1_expr(R0, I) ->
     R1 = i_comments(R0, I),
     case is_unary_op(R1) of
@@ -784,23 +793,48 @@ i_declaration(R0, I) ->
         [?kv(atom, 'spec') | _] ->
             R2 = i_kind(atom, R1, I),
             i_spec(R2, I);
-        [?kv(atom, 'type') | _] ->
+        [?kv(atom, Type) | _] when Type =:= 'type'; Type =:= 'opaque' ->
             R2 = i_kind(atom, R1, I),
-            i_type(R2, I);
+            i_typedef(R2, I);
         _ ->
             {R2, _A} = i_expr(R1, I, none),
             i_kind(dot, R2, I)
     end.
 
-i_type(R0, I) ->
+i_typedef(R0, I) ->
     {R1, _A1} = i_expr(R0, I, none),
     i_kind(dot, R1, I).
 
+i_type(R0, I0, A0) ->
+    {R1, A1} = case i_sniff(R0) of
+                   'fun' ->
+                       R11 = i_kind('fun', R0, I0),
+                       {i_spec(R11, I0), I0#i.anchor};
+                   _ ->
+                       i_expr(R0, I0, A0)
+               end,
+    case i_sniff(R1) of
+        '|' ->
+            I = i_with_old_or_new_anchor(A0, A1, I0),
+            R2 = i_kind('|', R1, I),
+            i_type(R2, I, I#i.anchor);
+        '::' -> %% Old?
+            I = i_with_old_or_new_anchor(A0, A1, I0),
+            R2 = i_kind('::', R1, I),
+            i_type(R2, I, I#i.anchor);
+        _ ->
+            {R1, A1}
+    end.
+
 i_spec_expr(R0, I) ->
-    {R1, _A} = i_expr(R0, I, none),
+    {R1, _A} = i_type(R0, I, none),
     case i_sniff(R1) of
         'when' ->
             R11 = i_kind('when', R1, I),
+            R12 = i_spec_aux(R11, I),
+            R12;
+        ',' ->
+            R11 = i_kind(',', R1, I),
             R12 = i_spec_aux(R11, I),
             R12;
         _ ->
