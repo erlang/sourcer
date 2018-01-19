@@ -43,7 +43,7 @@ default_indent_prefs() ->
      {end_paren, -1},
      {end_paren2, -2},
      {end_block, 0},
-     {record_def, 3},
+     {record_def, 2},
      {comment_3, 0},
      {comment_2, 0},
      {comment_1, 48},
@@ -125,7 +125,10 @@ indent(LineN, Tokens, Prefs) ->
 
 get_indent_of({_,eof,_,_}, C) ->
     C;
-get_indent_of({_, {_L, CA}, _, _}=_A, C) ->
+get_indent_of(?col(CA)=_A, {min, Prev, C}) ->
+    ?D({CA, C, _A}),
+    min(CA+C-1, Prev-1);
+get_indent_of(?col(CA)=_A, C) ->
     ?D({CA, C, _A}),
     CA+C-1.
 
@@ -230,6 +233,11 @@ i_with(W, I) ->
 i_with(W, A, I) ->
     I#i{current=indent_by(W, I#i.prefs), anchor=head(A)}.
 
+i_min_with(W, none, I) ->
+    i_with(W, I);
+i_min_with(W, A, #i{anchor=?col(Prev), current=C0}=I) ->
+    I#i{current={min, Prev+C0, indent_by(W, I#i.prefs)}, anchor=head(A)}.
+
 i_with_old_or_new_anchor(none, ANew, I) ->
     i_with(none, ANew, I);
 i_with_old_or_new_anchor(AOld, _ANew, I) ->
@@ -292,7 +300,7 @@ i_expr_rest(R0, I, A) ->
             {R2, A};
         '=' -> % match/assignment
             R1 = i_binary_op(R0, i_with(before_binary_op, I)),
-            {R2, _A} = i_expr(R1, i_with(after_binary_op, I), none),
+            {R2, _A} = i_expr(R1, i_with(after_binary_op, I), A),
             {R2, A};
         '=>' -> % maps
             R1 = i_binary_op(R0, i_with(before_binary_op, I)),
@@ -348,14 +356,14 @@ i_binary_expr_list(R0, I0, A0) ->
     ?D(R1),
     case i_sniff(R1) of
         '>>' ->
-            I1 = i_with(end_paren2, A0, I0),
+            I1 = i_min_with(end_paren2, A0, I0),
             i_kind('>>', R1, I1);
         _ ->
             {R2, A1} = i_binary_expr(R1, I0),
             I1 = i_with_old_or_new_anchor(A0, A1, I0),
             case i_sniff(R2) of
                 '>>' ->
-                    I2 = i_with(end_paren2, A0, I1),
+                    I2 = i_min_with(end_paren2, A0, I1),
                     i_kind('>>', R2, I2);
                 ',' ->
                     R3 = i_kind(',', R2, I1),
@@ -435,7 +443,12 @@ i_binary_op(R0, I) ->
 i_end_paren_or_expr_list(R0, I0) ->
     i_check(R0, I0),
     {R1, A0} = i_expr_list(R0, I0#i{in_block=false}, none),
-    I2 = i_with(end_paren, A0, I0),
+    I2 = case i_sniff(R1) of
+             ')' -> %% '(' is not an anchor
+                 i_with(end_paren, A0, I0);
+             _ ->
+                 i_min_with(end_paren, A0, I0)
+         end,
     i_end_paren(R1, I2).
 
 i_end_or_expr_list(R, I0) ->
@@ -649,18 +662,20 @@ i_two(R0, I) ->
     R1 = i_one(R0, I),
     i_one(R1, I).
 
-i_record([?k('#') | R0], I0) ->
-    I = I0#i{in_block=false},
+i_record([?k('#') | R0], I00) ->
+    I = I00#i{in_block=false},
     R1 = i_comments(R0, I),
     ?D(R1),
-    R2 = case i_sniff(R1) of
-             atom ->
-                 i_atom_or_macro(R1, I);
-             macro ->
-                 i_atom_or_macro(R1, I);
-             _ ->
-                 R1
-         end,
+    {R2,T} = case i_sniff(R1) of
+                 atom ->
+                     {i_atom_or_macro(R1, I),record};
+                 macro ->
+                     {i_atom_or_macro(R1, I),record};
+                 '{' ->
+                     {R1, map};
+                 _ ->
+                     {R1, undefined}
+             end,
     ?D(R2),
     case i_sniff(R2) of
         '.' ->
@@ -668,9 +683,13 @@ i_record([?k('#') | R0], I0) ->
             {R4, _A} = i_expr(R3, I, none),
             ?D(R4),
             {R4, I#i.anchor};
+        '{' when T =:= map ->
+            R3 = i_kind('{', R2, I),
+            I1 = i_with(paren, R2, I),
+            {i_end_paren_or_expr_list(R3, I1), hd(R2)};
         '{' ->
             R3 = i_kind('{', R2, I),
-            I1 = i_with(record_def, I),
+            I1 = i_with(record_def, R1, I),
             {i_end_paren_or_expr_list(R3, I1), hd(R1)};
         '[' ->
             i_expr(R2, I, none);
