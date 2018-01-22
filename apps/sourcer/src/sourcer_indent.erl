@@ -1,6 +1,3 @@
-%% Author: jakob
-%% Created: 2006-jan-28
-%% Description:
 -module(sourcer_indent).
 
 -export([
@@ -32,6 +29,7 @@ default_indent_prefs() ->
      {after_unary_op, 4},
      {clause, 4},
      {'case', 4},
+     {'icr', 8},
      {'try', 4},
      {'catch', 4},
      {'after', 4},
@@ -43,6 +41,7 @@ default_indent_prefs() ->
      {paren, 1},
      {delimiter, -1},
      {delimiter2,  1},
+     {delimiter3,  2},
      {'<<', 2},
      {end_paren, -1},
      {end_paren2, -2},
@@ -167,6 +166,8 @@ fetch_lines(_Lines, _NextLine, _First, Acc) ->
     Acc.
 
 %%
+reindent_line("\n", _, _) -> "\n";
+reindent_line("\r\n", _, _) -> "\r\n";
 reindent_line(Line, N, Prefs) ->
     L = reindent_line(Line, N),
     entab(L, proplists:get_value(use_tabs, Prefs), proplists:get_value(tab_len, Prefs)).
@@ -240,7 +241,7 @@ push(Tag, #i{anchor=[{_,A0}|As]} = I) ->
     I#i{current=none, anchor=[{Tag, A0}|As]}.
 
 push(Tag, A, #i{anchor=As} = I) ->
-    I#i{current=none, anchor=[{Tag, head(A)}|As]}.
+    I#i{current=none, anchor=[{Tag, head(skip_comments(A))}|As]}.
 
 pop(#i{anchor=[{_,_}|As]} = I) ->
     I#i{anchor=As}.
@@ -302,10 +303,6 @@ i_expr_rest(R0, I, A) ->
             R1 = i_kind(':', R0, I),
             R2 = i_1_expr(R1, I),
             i_expr_rest(R2, I, A);
-        '||' -> % list comprehension
-            R1 = i_kind('||', R0, I),
-            R2 = i_expr_list(R1, I),
-            {R2, I};
         '<=' -> % within binary comprehension
             R1 = i_kind('<=', R0, I),
             {R2, _A} = i_expr(R1, push(after_binary_op, I), A),
@@ -388,6 +385,9 @@ i_expr_list(R0, I0, A0) ->
                          end,
             R3 = i_kind(Delim, R2, i_with({delimiter, Start}, I1)),
             i_expr_list(R3, I1, A0);
+        '||' ->
+            R3 = i_kind('||', R2, I1),
+            i_expr_list(R3, push(clause, element(2,A0), pop_until(A0,I1)), A0);
         _ ->
             {R2, I1}
     end.
@@ -409,7 +409,7 @@ i_binary_expr_list(R0, I0, A0) ->
         Kind when Kind=:='||'; Kind=:='<='; Kind=:='<-' ->
             %% binary comprehension
             R3 = i_kind('||', R2, I2),
-            i_binary_expr_list(R3, I2, A0);
+            i_expr_list(R3, push(clause, pop_until(A0,I2)), A0);
         _ ->
             {R2, I2}
     end.
@@ -428,7 +428,7 @@ i_binary_expr(R0, I0) ->
 i_binary_sub_expr(R0, I0) ->
     case i_sniff(R0) of
         Kind when Kind=='('; Kind=='<<'; Kind==macro ->
-            i_expr(R0, I0, none);
+            i_expr(R0, I0, top(I0));
         Kind when Kind==var; Kind==string; Kind==integer; Kind==char ->
             R1 = i_comments(R0, I0),
             R2 = i_kind(Kind, R1, I0),
@@ -593,15 +593,15 @@ i_macro_rest(R0, I) ->
 i_if(R0, I1) ->
     R1 = i_kind('if', R0, I1),
     I2 = push('case', R0, I1),
-    R2 = i_if_clause_list(R1, I2, none),
+    R2 = i_if_clause_list(R1, I2, top(I2)),
     i_block_end('if', R0, R2, I1).
 
 i_case(R0, I1) ->
     R1 = i_kind('case', R0, I1),
     I2 = push('case', R0, I1),
     {R2, _A} = i_expr(R1, I2, none),
-    R3 = i_kind('of', R2, I2),
-    R4 = i_clause_list(R3, I2),
+    R3 = i_kind('of', R2, I1),
+    R4 = i_clause_list(R3, I2, icr),
     i_block_end('case', R0, R4, I1).
 
 i_receive(R0, I1) ->
@@ -611,7 +611,7 @@ i_receive(R0, I1) ->
              'after' ->
                  R1;
              _ ->
-                 i_clause_list(R1, I2)
+                 i_clause_list(R1, I2, icr)
          end,
     R4 = case i_sniff(R2) of
              'after' ->
@@ -630,22 +630,22 @@ i_try(R0, I1) ->
     ?D(R2),
     R3 = case i_sniff(R2) of
              'of' ->
-                 R21 = i_kind('of', R2, I1),
-                 i_clause_list(R21, I2);
+                 R21 = i_kind('of', R2, push(none, I2)),
+                 i_clause_list(R21, I2, icr);
              _ ->
                  R2
          end,
     R4 = case i_sniff(R3) of
              'catch' ->
-                 R31 = i_kind('catch', R3, I1),
+                 R31 = i_kind('catch', R3, push(none, I2)),
                  I11 = push('catch', R3, I1),
-                 i_catch_clause_list(R31, I11);
+                 i_clause_list(R31, I11, icr);
              _ ->
                  R3
          end,
     R5 = case i_sniff(R4) of
              'after' ->
-                 R41 = i_kind('after', R4, I1),
+                 R41 = i_kind('after', R4, push(none, I2)),
                  I12 = push('after', R4, I1),
                  i_expr_list(R41, I12);
              _ ->
@@ -796,8 +796,8 @@ i_form(R0, I) ->
         '-' ->
             i_declaration(R1, I);
         _ ->
-            R2 = i_clause(R1, I),
-            i_dot_or_semi(R2, I)
+            R3 = i_clause(R1, push(none, R1, I), after_arrow),
+            i_dot_or_semi(R3, I)
     end.
 
 i_dot_or_semi(R, I) ->
@@ -928,112 +928,64 @@ i_fun_clause_list(R, I0, A0) ->
     end.
 
 i_after_clause(R0, I0) ->
-    {R1, _A} = i_expr(R0, I0, none),
+    {R1, _A} = i_expr(R0, I0, top(I0)),
     R2 = i_kind('->', R1, I0),
-    i_expr_list(R2, I0).
+    i_expr_list(R2, push(icr, I0)).
 
-i_clause(R0, I) ->
-    {R1, I10} = i_expr(R0, I, none),
+i_clause(R0, I0, Tag) ->
+    {R1, I10} = i_expr(R0, I0, top(I0)),
     I1 = push(before_arrow, I10),
     {R4,I3} = case i_sniff(R1) of
                   'when' ->
                       R2 = i_kind('when', R1, I1),
-                      I2 = push('when', I1),
+                      When = case Tag of
+                                 icr -> 'after_when';
+                                 _ -> 'when'
+                             end,
+                      I2 = push(When, I0),
                       {R3, _A} = i_predicate_list(R2, I2),
                       {R3,I2};
                   _ ->
                       {R1, I1}
               end,
-    I4 = I3,
-    R5 = i_kind('->', R4, I4),
-    I5 = push(after_arrow, R0, pop(I4)),
+    R5 = i_kind('->', R4, I3),
+    I5 = push(Tag, I0),
     R = i_expr_list(R5, I5),
     ?D(R),
     R.
 
-i_clause_list(R, I) ->
+i_clause_list(R, I, Tag) ->
     ?D(R),
-    R0 = i_clause(R, I),
+    R0 = i_clause(R, I, Tag),
     ?D(R0),
     case i_sniff(R0) of
         ';' ->
-            R1 = i_kind(';', R0, I),
-            i_clause_list(R1, I);
+            R1 = i_kind(';', R0, push(delimiter3, I)),
+            i_clause_list(R1, I, Tag);
         _ ->
             R0
     end.
 
-i_if_clause(R0, I0) ->
-    {R1, A} = i_predicate_list(R0, I0),
-    I1 = push(before_arrow, A, I0),
+i_if_clause(R0, I0, A0) ->
+    {R1, I1} = i_predicate_list(R0, I0),
     R2 = i_kind('->', R1, I1),
-    I2 = I1,
-    I3 = push(after_arrow, I2),
-    R = i_expr_list(R2, I3),
+    I2 = push(icr, pop_until(A0, I1)),
+    R = i_expr_list(R2, I2),
     ?D(R),
-    {R, A}.
+    {R, I1}.
 
 i_if_clause_list(R0, I0, A0) ->
-    {R1, A1} = i_if_clause(R0, I0),
+    {R1, I1} = i_if_clause(R0, I0, A0),
     ?D({A1, R1}),
-    %% I1 = i_with_old_or_new_anchor(A0, A1, I0),
-    I1 = I0,
+    I2 = keep_one(A0, I1),
     ?D(I1),
     case i_sniff(R1) of
         ';' ->
-            ?D(a),
-            R2 = i_kind(';', R1, I0),
-            i_if_clause_list(R2, I1, A1);
+            R2 = i_kind(';', R1, push(delimiter3, pop_until(A0, I2))),
+            i_if_clause_list(R2, I2, A0);
         _ ->
             ?D(b),
             R1
-    end.
-
-i_catch_clause(R0, I0) ->
-    R1 = i_comments(R0, I0),
-    ?D(R1),
-    R2 = case i_sniff(R1) of
-             atom -> i_kind(atom, R1, I0);
-             var -> i_kind(var, R1, I0)
-         end,
-    ?D(R2),
-    R3 = case i_sniff(R2) of
-             ':' ->
-                 R21 = i_kind(':', R2, I0),
-                 ?D(R21),
-                 {R22, _A} = i_expr(R21, I0, none),
-                 ?D(R22),
-                 R22;
-             _ ->
-                 R2
-         end,
-    I1 = push(before_arrow, R1, I0),
-    R4 = case i_sniff(R3) of
-             'when' ->
-                 R31 = i_kind('when', R3, I1),
-                 I2 = push('when', R3, I1),
-                 {R32, _A0} = i_predicate_list(R31, I2),
-                 R32;
-             _ ->
-                 R3
-         end,
-    ?D(R4),
-    R5 = i_kind('->', R4, I1),
-    ?D(R5),
-    I3 = push(clause, R1, I0),
-    R = i_expr_list(R5, I3),
-    R.
-
-i_catch_clause_list(R, I) ->
-    R0 = i_catch_clause(R, I),
-    ?D(R0),
-    case i_sniff(R0) of
-        ';' ->
-            R1 = i_kind(';', R0, I),
-            ?D(R1),
-            i_catch_clause_list(R1, I);
-        _ ->
-            R0
     end.
 
 i_sniff(L) ->
@@ -1043,11 +995,3 @@ i_sniff(L) ->
         [?k(Kind) | _] ->
             Kind
     end.
-
-%% scan(S) ->
-%%     case sourcer_scan:tokens(S) of
-%%         {ok, T, _} ->
-%%             {ok, T};
-%%         Error ->
-%%             Error
-%%     end.
