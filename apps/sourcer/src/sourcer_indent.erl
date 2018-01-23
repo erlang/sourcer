@@ -22,34 +22,29 @@
 
 %% TODO: change into multiples of IndentW
 default_indent_prefs() ->
-    [{before_binary_op, 4},
-     {after_binary_op, 4},
-     {before_arrow, 2},
-     {after_arrow, 4},
-     {after_unary_op, 4},
-     {clause, 4},
-     {'case', 4},
-     {'icr', 8},
-     {'try', 4},
-     {'catch', 4},
-     {'after', 4},
-     {parameters, 2},
-     {'when', 6},
-     {'after_when', 10},
-     {'fun', 4},
-     {fun_body, 8},
-     {paren, 1},
-     {delimiter, -1},
-     {delimiter2,  1},
-     {delimiter3,  2},
-     {'<<', 2},
-     {end_paren, -1},
-     {end_paren2, -2},
-     {end_block, 0},
-     {record_def, 2},
-     {comment_3, 0},
-     {comment_2, 0},
-     {comment_1, 48},
+    [{after_op, 4},        %% indentW
+     {before_arrow, 2},    %% indentW div 2
+     {after_arrow, 4},     %% indentW
+     {clause, 4},          %% indentW
+     {'icr', 8},           %% indentW * 2 from 'case' or 'try' ... icr = if, case, receive
+     {parameters, 2},      %% indentW div 2
+     {'when', 6},          %% indentW + indentW div 2
+     {'after_when', 10},   %% indentW * 2 + indentW div 2 from 'case' or 'try' ...
+     {'fun', 4},           %% indentW
+     {fun_body, 8},        %% indentW * 2
+     {paren, 1},           %% after '(' '[' '#{'
+     {delimiter, -1},      %% line starts with '|' or ',' ';'
+     {delimiter_bin,  1},  %% line starts with ',' after a '<<'
+     {delimiter_clause,  2},  %% line starts with ';' between icr clauses
+     {delimiter_spec, -2},    %% line starts with '|' in specs or types
+     {'<<', 2},            %% '<<' is 2 wide
+     {end_paren, -1},      %% go left 1 when ')' '}' ']'
+     {end_paren2, -2},     %% go left 2 when '>>'
+     {end_block, 0},       %% end aligns with icr start
+     {record_def, 2},      %% indentW div 2
+     {comment_3, 0},       %% start of the line
+     {comment_2, 0},       %% start of the expression
+     {comment_1, 48},      %% column 48
 
      {indentW, 4},
      {use_tabs, false},
@@ -281,7 +276,7 @@ i_expr(R0, I0, A) ->
         macro ->
             case i_sniff(i_kind(macro, R1, I1)) of
                 macro ->
-                    i_expr(R2, i_with(after_binary_op, I1), A);
+                    i_expr(R2, push(after_op, I1), A);
                 _ ->
                     i_expr_rest(R2, I1, top(I1))
             end;
@@ -293,37 +288,37 @@ i_expr_rest(R0, I, A) ->
     case i_sniff(R0) of
         '(' -> % function call
             R1 = i_par_list(R0, I),
-            i_expr_rest(R1, I, A);
+            case is_binary_op(i_sniff(R1)) of
+                true -> i_expr_rest(R1, I, A);
+                false -> {R1, I}
+            end;
         eof ->
             {R0, I};
-        '#' -> % record something
-            ?D(I),
-            i_record(R0, I);
         ':' -> % external function call
             R1 = i_kind(':', R0, I),
             R2 = i_1_expr(R1, I),
             i_expr_rest(R2, I, A);
         '<=' -> % within binary comprehension
             R1 = i_kind('<=', R0, I),
-            {R2, _A} = i_expr(R1, push(after_binary_op, I), A),
+            {R2, _A} = i_expr(R1, push(after_op, I), A),
             {R2, I};
         '=' -> % match/assignment
             R1 = i_binary_op(R0, I),
-            {R2, _A} = i_expr(R1, push(after_binary_op, I), top(I)),
+            {R2, _A} = i_expr(R1, push(after_op, I), top(I)),
             {R2, I};
         '=>' -> % maps
             R1 = i_binary_op(R0, I),
-            {R2, _A} = i_expr(R1, push(after_binary_op, I), A),
+            {R2, _A} = i_expr(R1, push(after_op, I), A),
             {R2, I};
         ':=' -> % maps
             R1 = i_binary_op(R0, I),
-            {R2, _A} = i_expr(R1, push(after_binary_op, I), A),
+            {R2, _A} = i_expr(R1, push(after_op, I), A),
             {R2, I};
         '|' -> %% List
             {R0, I};
         '::' -> %% type
             R1 = i_kind('::', R0, I),
-            {R2, _A} = i_type(R1, I, none),
+            {R2, _A} = i_type(R1, push(before_arrow, I), A),
             {R2, I};
         _ ->
             case is_binary_op(i_sniff(R0)) of
@@ -373,7 +368,7 @@ i_expr_list(R0, I0, A0) ->
     R1 = i_comments(R0, I0),
     ?D(R1),
     {R2, I11} = i_expr(R1, I0, A0),
-    I1 = keep_one(A0, i_with(none, I11)),
+    I1 = keep_one(A0, I11),
     ?D({R2, I1, I11}),
     case i_sniff(R2) of
         Delim when Delim =:= ','; Delim =:= '|' ->
@@ -404,7 +399,7 @@ i_binary_expr_list(R0, I0, A0) ->
     I2 = keep_one(A0, I1),
     case i_sniff(R2) of
         ',' ->
-            R3 = i_kind(',', R2, push(delimiter2, pop_until(A0, I2))),
+            R3 = i_kind(',', R2, push(delimiter_bin, pop_until(A0, I2))),
             i_binary_expr_list(R3, I2, A0);
         Kind when Kind=:='||'; Kind=:='<='; Kind=:='<-' ->
             %% binary comprehension
@@ -455,7 +450,7 @@ i_binary_specifiers(R0, I) ->
 i_binary_specifier(R0, I) ->
     case i_sniff(R0) of
         '(' ->
-            {R1, _A} = i_expr(R0, I, none),
+            {R1, _A} = i_expr(R0, I, top(I)),
             R1;
         Kind when Kind==var; Kind==string; Kind==integer; Kind==atom; Kind==char ->
             R1 = i_comments(R0, I),
@@ -515,13 +510,9 @@ i_1_expr([?k('if') | _] = R, I) ->
     i_if(R, I);
 i_1_expr([?k('begin') | _] = R0, I0) ->
     R1 = i_kind('begin', R0, I0),
-    I1 = push('case', R0, I0),
+    I1 = push(clause, R0, I0),
     R2 = i_end_or_expr_list(R1, I1),
     i_block_end('begin', R0, R2, I0);
-%%     R1 = i_kind('begin', R0, I0),
-%%     I1 = i_with('case', R0, I0),
-%%     R2 = i_end_or_expr_list(R1, I1#i{in_block=false}),
-%%     i_block_end(T#token.kind, R2, I0);
 i_1_expr([?k('receive') | _] = R, I) ->
     i_receive(R, I);
 i_1_expr([?k('fun')=T | R0], I) ->
@@ -536,11 +527,11 @@ i_1_expr([?k('fun')=T | R0], I) ->
                     R1 = i_fun_clause_list(R0, I1, top(I1)),
                     i_kind('end', R1, push(none, I1));
                 _ ->
-                    {R1, _A} = i_expr(R0, I1, none),
+                    {R1, _A} = i_expr(R0, I1, top(I1)),
                     R1
             end;
         _ ->
-            {R1, _A} = i_expr(R0, I1, none),
+            {R1, _A} = i_expr(R0, I1, top(I1)),
             R1
     end;
 i_1_expr([?k('try') | _] = R, I) ->
@@ -553,7 +544,7 @@ i_1_expr(R0, I) ->
     case is_unary_op(R1) of
         true ->
             R2 = i_one(R1, I),
-            i_1_expr(R2, push(after_unary_op, R2, I));
+            i_1_expr(R2, push(after_op, R2, I));
         false ->
             R1
     end.
@@ -592,21 +583,21 @@ i_macro_rest(R0, I) ->
 
 i_if(R0, I1) ->
     R1 = i_kind('if', R0, I1),
-    I2 = push('case', R0, I1),
+    I2 = push(clause, R0, I1),
     R2 = i_if_clause_list(R1, I2, top(I2)),
     i_block_end('if', R0, R2, I1).
 
 i_case(R0, I1) ->
     R1 = i_kind('case', R0, I1),
-    I2 = push('case', R0, I1),
-    {R2, _A} = i_expr(R1, I2, none),
+    I2 = push(clause, R0, I1),
+    {R2, _A} = i_expr(R1, I2, top(I2)),
     R3 = i_kind('of', R2, I1),
     R4 = i_clause_list(R3, I2, icr),
     i_block_end('case', R0, R4, I1).
 
 i_receive(R0, I1) ->
     R1 = i_kind('receive', R0, I1),
-    I2 = push('case', R0, I1),
+    I2 = push(clause, R0, I1),
     R2 = case i_sniff(R1) of
              'after' ->
                  R1;
@@ -625,7 +616,7 @@ i_receive(R0, I1) ->
 
 i_try(R0, I1) ->
     R1 = i_kind('try', R0, I1),
-    I2 = push('try', R0, I1),
+    I2 = push(clause, R0, I1),
     R2 = i_expr_list(R1, I2),
     ?D(R2),
     R3 = case i_sniff(R2) of
@@ -638,7 +629,7 @@ i_try(R0, I1) ->
     R4 = case i_sniff(R3) of
              'catch' ->
                  R31 = i_kind('catch', R3, push(none, I2)),
-                 I11 = push('catch', R3, I1),
+                 I11 = push(clause, R3, I1),
                  i_clause_list(R31, I11, icr);
              _ ->
                  R3
@@ -646,7 +637,7 @@ i_try(R0, I1) ->
     R5 = case i_sniff(R4) of
              'after' ->
                  R41 = i_kind('after', R4, push(none, I2)),
-                 I12 = push('after', R4, I1),
+                 I12 = push(clause, R4, I1),
                  i_expr_list(R41, I12);
              _ ->
                  R4
@@ -663,7 +654,7 @@ is_binary_op(Op) ->
                       'bsr', 'or', 'xor', '<-', '=', '==', '/=',
                       '<', '>', '=<', '>=',
                       '=/=', '=:=', ':', '+', '-', '*', '/', '!',
-                      '++', '--', '.', '#', '|', '::']).
+                      '++', '--', '.', '#', '|']).
 
 is_unary_op([T | _]) ->
     is_unary_op(T);
@@ -708,9 +699,11 @@ i_record(R00, I) ->
     case i_sniff(R2) of
         '.' ->
             R3 = i_kind('.', R2, I),
-            {R4, _A} = i_expr(R3, I, none),
-            ?D(R4),
-            {R4, I};
+            R4 = i_atom_or_macro(R3, I),
+            case i_sniff(R4) of
+                '#' -> i_record(R4, I);
+                _ -> {R4, I}
+            end;
         '{' when T =:= map ->
             R3 = i_kind('{', R2, I),
             I1 = push(paren, R2, I),
@@ -768,7 +761,7 @@ i_atom_or_macro(R0, I) ->
         atom ->
             i_kind(atom, R0, I);
         macro ->
-            {R, _} = i_expr(R0, I, none),
+            {R, _} = i_expr(R0, I, top(I)),
             R
     end.
 
@@ -814,88 +807,98 @@ i_declaration(R0, I) ->
     case skip_comments(R1) of
         [?kv(atom, 'spec') | _] ->
             R2 = i_kind(atom, R1, I),
-            i_spec(R2, I);
+            i_spec(R2, push(spec, R1, I));
         [?kv(atom, Type) | _] when Type =:= 'type'; Type =:= 'opaque' ->
             R2 = i_kind(atom, R1, I),
-            i_typedef(R2, I);
+            i_typedef(R2, push(type, R1, I));
         _ ->
-            {R2, _A} = i_expr(R1, I, none),
+            {R2, _A} = i_expr(R1, push(none, R1, I), head(R0)),
             i_kind(dot, R2, I)
     end.
 
-i_typedef(R0, I) ->
-    {R1, _A1} = i_expr(R0, I, none),
-    i_kind(dot, R1, I).
+i_typedef(R0, I0) ->
+    {R1, I1} = i_expr(R0, I0, top(I0)),
+    R2 = i_kind('::', R1, I1),
+    I2 = push(before_arrow, I1),
+    R3 = i_type(R2, I2, top(I2)),
+    i_kind(dot, R3, I0).
 
 i_type(R0, I0, A0) ->
-    {R1, A1} = case i_sniff(R0) of
-                   'fun' ->
-                       R11 = i_kind('fun', R0, I0),
-                       {i_spec(R11, I0), I0#i.anchor};
-                   _ ->
-                       i_expr(R0, I0, A0)
+    {R1, I1} = case i_sniff(R0) of
+                   'fun' -> i_type_fun(R0, I0);
+                   _ -> i_expr(R0, I0, A0)
                end,
     case i_sniff(R1) of
         '|' ->
-            %% I = i_with_old_or_new_anchor(A0, A1, I0),
-            I = I0,
-            R2 = i_kind('|', R1, I),
-            i_type(R2, I, I#i.anchor);
-        '::' -> %% Old?
-            %% I = i_with_old_or_new_anchor(A0, A1, I0),
-            I = I0,
-            R2 = i_kind('::', R1, I),
-            i_type(R2, I, I#i.anchor);
+            I = keep_one(A0, I1),
+            R2 = i_kind('|', R1, push(delimiter_spec, I)),
+            i_type(R2, I, A0);
+        '::' ->
+            I = keep_one(A0, I1),
+            R2 = i_kind('|', R1, push(delimiter_spec, I)),
+            i_type(R2, I1, A0);
         _ ->
-            {R1, A1}
+            {R1, I1}
     end.
 
-i_spec_expr(R0, I) ->
-    {R1, _A} = i_type(R0, I, none),
+i_type_fun(R0, I0) ->
+    R1 = i_kind('fun', R0, I0),
+    R2 = i_kind('(', R1, I0),
+    I1 = push(none, R0, I0),
+    I2 = push(paren, R1, I1),
+    {R3, _} = i_spec_expr(R2, I0, top(I0)),
+    R4 = i_kind('->', R3, I2),
+    {R5, _} = i_spec_expr(R4, push(after_arrow, R3, I2), top(I2)),
+    R6 = i_kind(')', R5, push(none, R1, I0)),
+    {R6, I1}.
+
+i_spec_expr(R0, I0, A0) ->
+    {R1, I1} = i_type(R0, I0, A0),
     case i_sniff(R1) of
         'when' ->
-            R11 = i_kind('when', R1, I),
-            R12 = i_spec_aux(R11, I),
-            R12;
+            R11 = i_kind('when', R1, I1),
+            i_spec_expr(R11, I1, top(I1));
         ',' ->
-            R11 = i_kind(',', R1, I),
-            R12 = i_spec_aux(R11, I),
-            R12;
+            R11 = i_kind(',', R1, push(delimiter_spec, I1)),
+            i_spec_expr(R11, I1, top(I1));
         _ ->
-            R1
+            {R1,I1}
     end.
 
 i_spec_aux(R0, I0) ->
-    R1 = i_spec_expr(R0, I0),
-    case i_sniff(R1) of
+    {R1,I1} = case i_sniff(R0) of
+                  atom ->
+                      R10 = i_kind(atom, R0, I0),
+                      {R10, push(none, R10, I0)};
+                  '(' ->
+                      {R0, I0}
+              end,
+    R2 = i_kind('(', R1, I1),
+    {R3, _I2} = i_spec_expr(R2, I1, top(I1)),
+    R4 = i_kind(')', R3, I1),
+    case i_sniff(R4) of
         '->' ->
-            R2 = i_kind('->', R1, I0),
-            I1 = push(after_arrow, R0, I0),
-            i_spec_expr(R2, I1);
+            R5 = i_kind('->', R4, I1),
+            I3 = push(after_arrow, R0, I1),
+            {R6, _} = i_spec_expr(R5, I3, top(I3)),
+            {R6, push(none, R1, I1)};
         _ ->
-            R1
+            {R4, I1}
     end.
 
-i_spec_list(R0, I) ->
-    R1 = i_spec_aux(R0, I),
+i_spec_list(R0, I0, A0) ->
+    {R1,I1} = i_spec_aux(R0, I0),
     case i_sniff(R1) of
         ';' ->
-            R2 = i_kind(';', R1, I),
-            i_spec_list(R2, I);
+            I2 = keep_one(A0, I1),
+            R2 = i_kind(';', R1, I2),
+            i_spec_list(R2, I2, A0);
         _ ->
             R1
     end.
 
 i_spec(R0, I) ->
-    R = case i_sniff(R0) of
-            '(' ->
-                R1 = i_kind('(', R0, I),
-                R2 = i_spec_list(R1, I),
-                R3 = i_kind(')', R2, I),
-                R3;
-            _ ->
-                i_spec_list(R0, I)
-        end,
+    R = i_spec_list(R0, I, top(I)),
     i_dot_or_semi(R, I).
 
 i_fun_clause(R0, I0, A0) ->
@@ -921,7 +924,7 @@ i_fun_clause_list(R, I0, A0) ->
     I2 = keep_one(A0, I1),
     case i_sniff(R0) of
         ';' ->
-            R1 = i_kind(';', R0, i_with(delimiter, I2)),
+            R1 = i_kind(';', R0, push(delimiter_clause, A0, I2)),
             i_fun_clause_list(R1, I2, A0);
         _ ->
             R0
@@ -960,7 +963,7 @@ i_clause_list(R, I, Tag) ->
     ?D(R0),
     case i_sniff(R0) of
         ';' ->
-            R1 = i_kind(';', R0, push(delimiter3, I)),
+            R1 = i_kind(';', R0, push(delimiter_clause, I)),
             i_clause_list(R1, I, Tag);
         _ ->
             R0
@@ -981,7 +984,7 @@ i_if_clause_list(R0, I0, A0) ->
     ?D(I1),
     case i_sniff(R1) of
         ';' ->
-            R2 = i_kind(';', R1, push(delimiter3, pop_until(A0, I2))),
+            R2 = i_kind(';', R1, push(delimiter_clause, pop_until(A0, I2))),
             i_if_clause_list(R2, I2, A0);
         _ ->
             ?D(b),
