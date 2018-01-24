@@ -7,21 +7,24 @@
 main(Args) ->
     case getopt:parse(cli_options(), Args) of
         {ok, {Opts, _Other}} ->
-            case proplists:get_value(dump, Opts) of
-                undefined ->
+            Dump = proplists:get_value(dump, Opts),
+            Indent = proplists:get_value(indent, Opts),
+            if Dump =:= undefined, Indent =:= undefined ->
                     start_server(Opts);
-                File ->
-                    dump_file(File)
+               is_list(Indent) ->
+                    indent(Indent);
+               is_list(Dump) ->
+                    dump_file(Dump)
             end;
         _Err ->
             io:format("Error: ~p~n", [_Err]),
             getopt:usage(cli_options(), "lsp_server")
-    end,
-    ok.
+    end.
 
 cli_options() ->
     [
      {dump,    $d,        "dump",     string,      "Dump sourcer db for file"},
+     {indent,  $i,        "indent",   string,      "Indent file and exit"},
      {port,    $p,        "port",    integer,               "LSP server port"},
      {verbose, $v,        "verbose", integer,               "Verbosity level"}
     ].
@@ -50,8 +53,33 @@ scan(D) ->
 dump_file(File) ->
     io:format("Dump: ~tp~n", [File]),
     {ok, Content} = file:read_file(File),
-    {model,_,D,R} = sourcer_db:analyse(sourcer_parse:parse(scan(Content))),
+    {ST,Tokens} = timer:tc(fun() -> scan(Content) end),
+    {PT,ParseTree} = timer:tc(fun() -> sourcer_parse:parse(Tokens) end),
+    {AT, {model,_,D,R}} = timer:tc(fun() -> sourcer_db:analyse(ParseTree) end),
     C = case io:columns() of {ok, Cc} -> Cc; _ -> 80 end,
     io:format("Definitions:::~n~*p~n-----~n", [C, lists:sort(D)]),
     io:format("References:::~n~*p~n-----~n", [C, lists:sort(R)]),
+    io:format("Scan:    ~.6wms~n", [ST div 1000]),
+    io:format("Parse:   ~.6wms~n", [PT div 1000]),
+    io:format("Analyze: ~.6wms~n", [AT div 1000]),
     ok.
+
+indent(File) ->
+    case file:read_file(File) of
+        {ok, BinSrc} ->
+            Enc = encoding(BinSrc),
+            Src = unicode:characters_to_list(BinSrc, Enc),
+            {ST,Indented} = timer:tc(fun() -> sourcer_indent:lines(Src) end),
+            ok = file:write_file(File, unicode:characters_to_binary(Indented, utf8, Enc)),
+            io:format("Indent:    ~.6wms~n", [ST div 1000]),
+            ok;
+        {error, Error} ->
+            io:format("Could not read file: ~s\n Reason: ~p~n",[File, Error]),
+            erlang:halt(1)
+    end.
+
+encoding(Bin) ->
+    case epp:read_encoding_from_binary(Bin) of
+        latin1 -> latin1;
+        _ -> utf8
+    end.
