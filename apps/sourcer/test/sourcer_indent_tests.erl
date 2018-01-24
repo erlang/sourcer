@@ -16,7 +16,7 @@ indent_test_() ->
     Res = [diff(Orig, File) || {Orig, File} <- Fs],
     [file:delete(File) || {ok, File} <- Res],       %% Cleanup
     Failed = [Fail || {fail, Fail} <- Res],
-    ?_assertEqual([],Failed).
+    [?_assertMatch({ok, _}, Result) || Result <- Res].
 
 unindent(Input) ->
     Output = Input ++ ".erl",
