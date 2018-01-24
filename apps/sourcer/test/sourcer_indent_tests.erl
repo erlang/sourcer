@@ -10,16 +10,20 @@ indent_test_() ->
     io:format("Dir: ~s~nFs: ~p~n", [Dir, OrigFs]),
     Fs = [{File, unindent(File)} || File <- OrigFs,
                                     filename:extension(File) =:= ""],
-    %% Indent = fun emacs/1,
     Indent = fun sourcerer/1,
     [Indent(File) || {_, File} <- Fs],
     Res = [diff(Orig, File) || {Orig, File} <- Fs],
-    [file:delete(File) || {ok, File} <- Res],       %% Cleanup
-    Failed = [Fail || {fail, Fail} <- Res],
-    [?_assertMatch({ok, _}, Result) || Result <- Res].
+    {setup, 
+        fun()-> ok end,
+        fun(_)-> 
+            [file:delete(File) || {_, File} <- Res],
+            ok
+        end,
+        [?_assertMatch({ok, _}, Result) || Result <- Res]
+    }.
 
 unindent(Input) ->
-    Output = Input ++ ".erl",
+    Output = Input ++ ".actual",
     {ok, Bin} = file:read_file(Input),
     Lines0 = string:split(Bin, "\n", all),
     Lines = [string:trim(Line, leading, [$\s,$\t]) || Line <- Lines0],
