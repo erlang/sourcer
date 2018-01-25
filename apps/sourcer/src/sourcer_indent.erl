@@ -94,13 +94,15 @@ do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
             end
     end.
 
-%% TODO: value 4 is hardcoded! Should use indentation width here
+pref(Key, Prefs) ->
+    lists:keyfind(Key, 1, Prefs).
+
 indent(LineN, Tokens, Prefs) ->
     I = #i{anchor=[], indent_line=LineN, current=none},
     try
         i_form_list(Tokens, I),
         ?D(no_catch),
-        4
+        pref(indentW, Prefs)
     catch
         throw:{indent, A, C} ->
             ?D({indent, A, C}),
