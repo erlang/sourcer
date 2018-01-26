@@ -60,10 +60,10 @@ indent_case(1, Z) ->
             foo(X);
         {Z,_,_}
           when   Z < 10 orelse
-              Z =:= foo ->			% emacs differ see below
+                 Z =:= foo ->
             X = 43 div 4,
             Bool = Z < 5 orelse                 % Emacs Binary op args align differently after when
-                Z =:= foo,                      % and elsewhere ???
+                   Z =:= foo,
             foo(X);
         {Z,_,_}
           when					% when should be indented

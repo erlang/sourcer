@@ -21,11 +21,11 @@
                  }).
 
 -record(record3, {r3a = 8#42423 bor
-                      8#4234,
+                        8#4234,  %% differ emacs
                   r3b = 8#5432
-                      bor 2#1010101,
+                        bor 2#1010101, %% differ emacs
                   r3c = 123 +
-                      234,
+                        234, %% differ emacs
                   r3d}).
 
 -record(record5,

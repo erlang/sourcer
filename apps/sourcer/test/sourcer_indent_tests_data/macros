@@ -3,6 +3,10 @@
 
 %%% Macros should be indented as code
 
+-export([
+        ]
+       ).
+
 -define(M0, ok).
 
 -define(M1,

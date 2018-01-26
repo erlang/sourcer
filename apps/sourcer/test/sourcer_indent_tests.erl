@@ -1,7 +1,7 @@
 %%
 %%
 -module(sourcer_indent_tests).
-
+-export([sourcer/1]).
 -include_lib("eunit/include/eunit.hrl").
 
 indent_test_() ->
@@ -10,7 +10,7 @@ indent_test_() ->
     io:format("Dir: ~s~nFs: ~p~n", [Dir, OrigFs]),
     Fs = [{File, unindent(File)} || File <- OrigFs,
                                     filename:extension(File) =:= ""],
-    Indent = fun sourcerer/1,
+    Indent = fun sourcer/1,
     [Indent(File) || {_, File} <- Fs],
     Res = [diff(Orig, File) || {Orig, File} <- Fs],
     {setup, 
@@ -40,7 +40,7 @@ diff(Orig, File) ->
             {fail, File}
     end.
 
-sourcerer(File) ->
+sourcer(File) ->
     io:format("* Indenting: ~s *~n",[File]),
     {ok, Bin} = file:read_file(File),
     Src = unicode:characters_to_list(Bin),

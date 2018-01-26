@@ -6,7 +6,7 @@
          lines/2
         ]).
 
-%% -define(DEBUG, true).
+%%-define(DEBUG, true).
 -ifdef(DEBUG).
 -define(D(T), io:format("~p\n", [{??T, ?MODULE, ?LINE, T}])).
 -define(D(F,A), io:format("~w:~w: " ++ F, [?MODULE, ?LINE|A])).
@@ -298,7 +298,8 @@ i_expr_rest(R0, I, A) ->
             {R2, I};
         '=' -> % match/assignment
             R1 = i_binary_op(R0, I),
-            {R2, _A} = i_expr(R1, push(after_op, I), top(I)),
+            I1 = push(after_op, I),
+            {R2, _A} = i_expr(R1, I1, top(I1)),
             {R2, I};
         '=>' -> % maps
             R1 = i_binary_op(R0, I),
@@ -317,9 +318,16 @@ i_expr_rest(R0, I, A) ->
         _ ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
-                    I1 = pop_until(A, I),
-                    R1 = i_binary_op(R0, I1),
-                    {R2, _A} = i_expr(R1, I1, A),
+                    {Anchor, _} = A,
+                    Align = [after_op, 'after_when', clause, paren],
+                    I2 = case lists:member(Anchor, Align) of
+                             true ->
+                                 push(none, keep_one(A, I));
+                             false ->
+                                 push(clause, keep_one(A, I))
+                         end,
+                    R1 = i_binary_op(R0, I2),
+                    {R2, _} = i_expr(R1, I2, A),
                     {R2, I};
                 false ->
                     {R0, I}
@@ -338,9 +346,24 @@ i_par_list(R0, I0) ->
     i_end_paren_or_expr_list(R1,I1).
 
 i_end_paren_or_expr_list(R0, I0) ->
-    i_check(R0, I0),
-    {R1, I} = i_expr_list(R0, I0, top(I0)),
-    i_end_paren(R1, I, top(I0)).
+    i_end_paren_or_expr_list(R0, I0, top(I0)).
+
+i_end_paren_or_expr_list(R0, I0, A0) ->
+    case i_sniff(R0) of
+        Kind when Kind==')'; Kind=='}'; Kind==']'; Kind==eof ->
+            i_end_paren(R0, I0, A0);
+        _ ->
+            {R1, I} = i_expr_list(R0, I0, top(I0)),
+            case i_sniff(R1) of
+                Kind when Kind==')'; Kind=='}'; Kind==']'; Kind==eof ->
+                    i_end_paren(R1, I, A0);
+                '->' -> %% Type or Macro def
+                    R2 = i_kind('->', R1, I0),
+                    i_end_paren_or_expr_list(R2, I0);
+                _ ->
+                    R0
+            end
+    end.
 
 i_end_or_expr_list(R, I0) ->
     i_check(R, I0),
@@ -372,7 +395,8 @@ i_expr_list(R0, I0, A0) ->
             i_expr_list(R3, I1, A0);
         '||' ->
             R3 = i_kind('||', R2, I1),
-            i_expr_list(R3, push(clause, element(2,A0), pop_until(A0,I1)), A0);
+            I2 = push(clause, element(2,A0), pop_until(A0,I1)),
+            i_expr_list(R3, I2, top(I2));
         _ ->
             {R2, I1}
     end.
@@ -452,7 +476,8 @@ i_predicate_list(R0, I0, A0) ->
     case i_sniff(R2) of
         Kind when Kind==','; Kind==';' ->
             R3 = i_kind(Kind, R2, I1),
-            i_predicate_list(R3, I1, A0);
+            I2 = keep_one(A0, I1),
+            i_predicate_list(R3, I2, A0);
         _ ->
             {R2, I1}
     end.
@@ -552,7 +577,7 @@ i_macro_rest(R0, I) ->
                K=:='end'; K=:='->'; K =:= '||' ->
             R0;
         K ->
-            case sourcer_scan:reserved_word(K) of
+            case erl_scan:reserved_word(K) of
                 true ->
                     R0;
                 _ ->
@@ -947,7 +972,7 @@ i_clause_list(R, I, Tag) ->
     end.
 
 i_if_clause(R0, I0, A0) ->
-    {R1, I1} = i_predicate_list(R0, I0),
+    {R1, I1} = i_predicate_list(R0, I0, A0),
     R2 = i_kind('->', R1, I1),
     I2 = push(icr, pop_until(A0, I1)),
     R = i_expr_list(R2, I2),
