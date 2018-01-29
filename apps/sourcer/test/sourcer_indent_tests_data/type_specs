@@ -83,12 +83,12 @@
 -spec mod:t2() -> any().
 
 -spec handle_cast(Cast :: {'exchange', node(), [[name(),...]]}
-                | {'del_member', name(), pid()}, % Emacs differ
+                        | {'del_member', name(), pid()},
                   #state{}) -> {'noreply', #state{}}.
 
 -spec handle_cast(Cast ::
                     {'exchange', node(), [[name(),...]]}
-                | {'del_member', name(), pid()}, % Emacs differ
+                  | {'del_member', name(), pid()},
                   #state{}) ->
           {'noreply', #state{}}.
 
@@ -97,8 +97,8 @@
 
 -spec get_closest_pid(term()) ->
           Return :: pid()
-        | {'error', {'no_process', term()}} % Emacs differ
-        | {'no_such_group', term()}}.       % Emacs differ
+                  | {'error', {'no_process', term()}}
+                  | {'no_such_group', term()}}.
 
 -spec add( X :: integer()
          , Y :: integer()
@@ -107,3 +107,33 @@
 -opaque attributes_data() ::
           [{'column', column()} | {'line', info_line()} |
            {'text', string()}] |  {line(),column()}.
+
+
+-callback handle_call(Request :: term(),
+                      From :: {pid(),
+                               Tag :: term()},
+                      State :: term()) ->
+              {reply, Reply :: term(), NewState :: term()} |
+              {reply, Reply :: term(), NewState :: term(), timeout() | hibernate} |
+              {noreply, NewState :: term()} |
+              {noreply, NewState :: term(), timeout() | hibernate} |
+              {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
+              {stop, Reason :: term(), NewState :: term()}.
+
+-spec load(AppDescr, Distributed) ->
+          'ok' | {'error', Reason} when
+      AppDescr :: Application | (AppSpec :: application_spec()),
+      Application :: atom(),
+      Distributed :: {Application,Nodes}
+                   | {Application,Time,Nodes}
+                   | 'default',
+      Nodes :: [node() | tuple_of(node())],
+      Time :: pos_integer(),
+      Reason :: term().
+
+-spec sparse_push_tuple_pairs(non_neg_integer(), array_indx(),
+                              _, _, indx_pairs(Type)) -> indx_pairs(Type).
+
+-type f() :: {module(), atom(), list()}
+           | nonempty_maybe_improper_list(fun(), list())
+           | fun().
