@@ -49,7 +49,7 @@ tuple(4) ->
     }.
 
 binary(1) ->
-    <<1:8,
+    <<1:8/unsigned-native,
       2:8
     >>;
 binary(2) ->
@@ -69,7 +69,10 @@ binary(4) ->
 binary(5) ->
     << 1:8
      , 2:8
-    >>.
+     , ?macro1():?macro2()
+    >>;
+binary(6) ->
+    <<0.0:32/float>>;
 
 record(1) ->
     #record{a=1,
@@ -172,3 +175,16 @@ some_function_name_xyz(xyzzy, #some_record{
 foo() ->
     [#foo{
         foo = foo}].
+
+list_string() ->
+    ListString = "sune L"
+                 "kalle L"
+                 "oskar L",
+    {ok, ListString}.
+
+binary_string() ->
+    BinString = <<"sune B"
+                  "kalle B"
+                  "oskar B"/binary>>,
+    {ok, BinString}.
+

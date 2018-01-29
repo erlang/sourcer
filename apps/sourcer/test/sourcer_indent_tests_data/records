@@ -33,3 +33,8 @@
         , r5b = foobar :: atom()
         }).
 
+
+record_usage(A) ->
+    %% Test parser
+    A = bnot (id())#record_usage.r5a,
+    {ok, A}.

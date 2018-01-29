@@ -111,8 +111,8 @@ indent(LineN, Tokens, Prefs) ->
         throw:{indent_to, N} ->
             N;
         error:_E ->
-            ?D("~p:~p: Error: ~P~n  ~P~n",
-               [?MODULE, ?LINE, _E, 20, erlang:get_stacktrace(), 20]),
+            ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
+               [?MODULE, ?LINE, LineN, _E, 20, erlang:get_stacktrace(), 20]),
             ?D(error(parse_error)),
             0
     end.
@@ -288,6 +288,9 @@ i_expr_rest(R0, I, A) ->
             end;
         eof ->
             {R0, I};
+        '#' -> % record something
+            {R1, _} = i_record(R0, I),
+            i_expr_rest(R1, I, A);
         ':' -> % external function call
             R1 = i_kind(':', R0, I),
             R2 = i_1_expr(R1, I),
@@ -436,7 +439,9 @@ i_binary_sub_expr(R0, I0) ->
     case i_sniff(R0) of
         Kind when Kind=='('; Kind=='<<'; Kind==macro ->
             i_expr(R0, I0, top(I0));
-        Kind when Kind==var; Kind==string; Kind==integer; Kind==char ->
+        string ->
+            i_expr(R0, I0, top(I0));
+        Kind when Kind==var; Kind==integer; Kind==char; Kind==float ->
             R1 = i_comments(R0, I0),
             R2 = i_kind(Kind, R1, I0),
             {i_1_expr(R2, I0), push(none, R1, I0)};
@@ -462,6 +467,8 @@ i_binary_specifier(R0, I) ->
         '(' ->
             {R1, _A} = i_expr(R0, I, top(I)),
             R1;
+        'macro' ->
+            i_1_expr(R0, I);
         Kind when Kind==var; Kind==string; Kind==integer; Kind==atom; Kind==char ->
             R1 = i_comments(R0, I),
             i_kind(Kind, R1, I)
@@ -685,7 +692,7 @@ is_binary_op(Op) ->
 is_unary_op([T | _]) ->
     is_unary_op(T);
 is_unary_op(?k(Op)) ->
-    lists:member(Op, ['not', '-', '?', 'catch']).
+    lists:member(Op, ['not', '-', '?', 'catch', 'bnot']).
 
 i_block_end(_Begin, R0, R1, I0) ->
     I1 = push(end_block, R0, I0),
@@ -759,11 +766,13 @@ i_comments([?k(white_space) | Rest], I) ->
 i_comments([?k(comment) = C | Rest], I) ->
     case comment_kind(C) of
         comment_1 ->
-            i_check([C], push(comment_1, C, I));
+            ?line(L) = C,
+            i_check([C], push(comment_1, setelement(2, C, {L,1}), I));
         comment_2 ->  %% context dependent
             i_check([C], I);
         comment_3 ->
-            i_check([C], push(comment_3, C, I))
+            ?line(L) = C,
+            i_check([C], push(comment_3, setelement(2, C, {L,1}), I))
     end,
     i_comments(Rest, I);
 i_comments(Rest, I) ->
@@ -790,8 +799,10 @@ i_atom_or_macro(R0, I) ->
 
 i_kind(Kind, R0, I) ->
     R1 = i_comments(R0, I),
-    [?k(Kind) | R2] = R1,
-    R2.
+    case R1 of
+        [?k(Kind) | R2] -> R2;
+        _ -> error({expected, Kind, R0})
+    end.
 
 i_end_paren(R0, I0, A) ->
     {paren, BegParen} = top(pop_until(paren, pop_until(A, I0))),
