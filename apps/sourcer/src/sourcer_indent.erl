@@ -70,7 +70,7 @@ lines(S, Prefs) ->
 -record(i, {indent_line, anchor, current}).
 
 get_prefs([], OldP, Acc) ->
-    Acc ++ OldP;
+    maps:from_list(Acc ++ OldP);
 get_prefs([{Key, Value} | Rest], OldP, Acc) ->
     P = lists:keydelete(Key, 1, OldP),
     get_prefs(Rest, P, [{Key, Value} | Acc]).
@@ -84,14 +84,19 @@ do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
         {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
             %% ?D("~p: ~s",[LineNr, array:get(LineNr, Lines0)]),
             ToCol = indent(LineNr, FormTokens, Prefs),
-            L = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
-            Lines = array:set(LineNr, L, Lines0),
+            {Changed, L} = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
             case LastLoc of
-                {LineNr, _} ->
+                {LineNr, _} when Changed ->
+                    Lines = array:set(LineNr, L, Lines0),
                     do_indent_lines(LineNr+1, Tokens, Lines, Prefs);
-                _ ->
+                {LineNr, _} ->
+                    do_indent_lines(LineNr+1, Tokens, Lines0, Prefs);
+                _ when Changed ->
+                    Lines = array:set(LineNr, L, Lines0),
                     ReScan = rescan_form(Form, Lines),
-                    do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs)
+                    do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs);
+                _ ->
+                    do_indent_lines(LineNr+1, Tokens0, Lines0, Prefs)
             end
     end.
 
@@ -122,13 +127,21 @@ split_lines(Str) ->
 
 split_lines([$$, C| Rest], Line) ->
     split_lines(Rest, [C, $$|Line]);
-split_lines("\r\n" ++ Rest, Line) ->
-    [lists:reverse(Line, "\r\n")|split_lines(Rest,[])];
+split_lines([$%|Rest], Line) ->
+    until_nl(Rest, [$%|Line]);
 split_lines("\n" ++ Rest, Line) ->
     [lists:reverse(Line, "\n")|split_lines(Rest,[])];
 split_lines([C|Rest], Line) ->
     split_lines(Rest, [C|Line]);
 split_lines([], Line) ->
+    [lists:reverse(Line)].
+
+%% Needed to handle commented lines that end with '$'
+until_nl("\n" ++ Rest, Line) ->
+    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
+until_nl([C|Rest], Line) ->
+    until_nl(Rest, [C|Line]);
+until_nl([], Line) ->
     [lists:reverse(Line)].
 
 fetch_form(Line, [{_, _, {End, _}}=Form|Rest])
@@ -159,30 +172,42 @@ fetch_lines(_Lines, _NextLine, _First, Acc) ->
     Acc.
 
 %%
-reindent_line("\n", _, _) -> "\n";
-reindent_line("\r\n", _, _) -> "\r\n";
+reindent_line("\n"=L, _, _) -> {false, L};
+reindent_line("\r\n"=L, _, _) -> {false, L};
 reindent_line(Line, N, Prefs) ->
-    L = reindent_line(Line, N),
-    entab(L, proplists:get_value(use_tabs, Prefs), proplists:get_value(tab_len, Prefs)).
+    {Changed, L} =
+        case reindent_line_1(Line, N, 0) of
+            false -> {false, Line};
+            Indented -> {true, Indented}
+        end,
+    UseTabs = indent_by(use_tabs, Prefs),
+    TabLen  = indent_by(tab_len, Prefs),
+    {Tabbed, Res} = entab(L, UseTabs, TabLen),
+    {Changed orelse Tabbed, Res}.
 
-reindent_line(" " ++ S, I) ->
-    reindent_line(S, I);
-reindent_line("\t" ++ S, I) ->
-    reindent_line(S, I);
-reindent_line(S, I) when is_integer(I), I>0 ->
-    lists:duplicate(I, $ ) ++ S;
-reindent_line(S, I) when is_integer(I) ->
+reindent_line_1(" " ++ S, I, N) ->
+    reindent_line_1(S, I, N+1);
+reindent_line_1("\t" ++ S, I, N) ->
+    reindent_line_1(S, I, N+100);
+reindent_line_1(S, I, N) when is_integer(I), I>0 ->
+    case I =:= N of
+        true  -> false;
+        false -> lists:duplicate(I, $ ) ++ S
+    end;
+reindent_line_1(_S, 0, 0) ->
+    false;
+reindent_line_1(S, 0, _) ->
     S.
 
 entab(S, false, _Tablength) ->
-    S;
+    {false, S};
 entab(S, true, Tablength) when Tablength < 2->
-    S;
+    {false, S};
 entab(S, true, Tablength) ->
     {Spaces, Line} = string:take(S, "\s\t"),
     N = lists:foldl(fun($\s, N) -> N+1; ($\t, N) -> N+Tablength end, 0, Spaces),
-    lists:append([lists:duplicate($\t, N div Tablength),
-                  lists:duplicate($\s, N rem Tablength), Line]).
+    {true, lists:append([lists:duplicate($\t, N div Tablength),
+                         lists:duplicate($\s, N rem Tablength), Line])}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -207,8 +232,9 @@ i_check(T, I) ->
             throw(Throw)
     end.
 
+indent_by(none, _) -> 0;
 indent_by(Key, Prefs) ->
-    proplists:get_value(Key, Prefs, 0).
+    maps:get(Key, Prefs, 0).
 
 get_indent_of([{What, ?col(CA)}=_A|_], {C, ?col(Exp)}, Prefs) when is_atom(What), is_atom(C) ->
     Col0 = CA+indent_by(What, Prefs),
