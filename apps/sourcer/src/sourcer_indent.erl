@@ -845,6 +845,9 @@ i_declaration(R0, I) ->
         [?kv(atom, Type) | _] when Type =:= 'type'; Type =:= 'opaque' ->
             R2 = i_kind(atom, R1, I),
             i_typedef(R2, push(type, R1, I));
+        [?kv(atom, 'define') | _] ->
+            R2 = i_kind(atom, R1, I),
+            i_macro_def(R2, push(clause, R1, I));
         _ ->
             {R2, _A} = i_expr(R1, push(none, R1, I), head(R0)),
             i_kind(dot, R2, I)
@@ -955,6 +958,42 @@ i_spec(R0, I) ->
 		i_spec_list(R0, I, top(I))
 	end,
     i_dot_or_semi(R, I).
+
+i_macro_def(R0, I0) ->
+    R1 = i_kind('(', R0, I0),
+    I10 = push('paren', R0, I0),
+    I1 = push(parameters, element(2,top(I0)), I10),
+    {R2, I2} = i_expr(R1, I1, top(I1)),
+    R3 = i_kind(',', R2, I1),
+    {R4, I3} = i_macro_exp(R3, I2, top(I1)),
+    R5 = i_end_paren(R4, I3, top(I1)),
+    i_kind('dot', R5, I0).
+
+i_macro_exp(R0, I0, A0) ->
+    {R1, I1} = i_expr(R0, I0, A0),
+    case i_sniff(R1) of
+        'when' ->
+            I2 = push('before_arrow', I0),
+            R2 = i_kind('when', R1, I2),
+            I3 = push('when', I2),
+            {R3, _} = i_predicate_list(R2, I3),
+            i_macro_exp(R3, I1, A0);
+        '->' ->
+            R2 = i_kind('->', R1, I1),
+	    I2 = push(after_arrow, I0),
+	    R3 = i_expr_list(R2, I2),
+            i_macro_exp(R3, I1, A0);
+        ';' ->
+            R2 = i_kind(';', R1, I0),
+            I2 = keep_one(A0, I1),
+            i_macro_exp(R2, I2, A0);
+        ',' ->
+            R2 = i_kind(',', R1, I0),
+            I2 = keep_one(A0, I1),
+            i_macro_exp(R2, I2, A0);
+        _ ->
+            {R1, I1}
+    end.
 
 i_fun_clause(R0, I0, A0) ->
     R1 = i_comments(R0, I0),

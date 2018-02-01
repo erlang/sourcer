@@ -33,3 +33,28 @@
 -else().
 -define(LOG, ok).
 -endif().
+
+-define(PARSE_XML_DECL(Bytes, State),
+        parse_xml_decl(Bytes, #xmerl_sax_parser_state{encoding=Enc} = State)
+          when is_binary(Bytes) ->
+            case unicode:characters_to_list(Bytes, Enc) of
+                {incomplete, _, _} ->
+                    cf(Bytes, State, fun parse_xml_decl/2);
+                {error, _Encoded, _Rest} ->
+                    ?fatal_error(State,  "Bad character");
+                _ ->
+                    parse_prolog(Bytes, State)
+            end;
+        parse_xml_decl(Bytes, State) ->
+            parse_prolog(Bytes, State)).
+
+
+-define(fatal(Reason, S),
+        if
+            S#record.quiet ->
+                ok;
+            true ->
+                error_logger:error_msg("~p- fatal: ~p~n", [?LINE, Reason]),
+                ok
+        end,
+        fatal(Reason, S)).
