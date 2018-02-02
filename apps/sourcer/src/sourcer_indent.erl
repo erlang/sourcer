@@ -67,7 +67,7 @@ lines(S, Prefs) ->
 %% Local Functions
 %%
 
--record(i, {indent_line, anchor, current}).
+-record(i, {indent_line, anchor, current, check}).
 
 get_prefs([], OldP, Acc) ->
     maps:from_list(Acc ++ OldP);
@@ -78,12 +78,16 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
 get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
-do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
-    case fetch_form(LineNr, Tokens0) of
-        eof -> Lines0;
+do_indent_lines(LineNr0, Tokens0, Lines0, Prefs) ->
+    put(?MODULE, LineNr0),
+    Stop = fun(Line, A, C) -> check_indent_lines(Line, A, C, Lines0, Prefs) end,
+    case fetch_form(LineNr0, Tokens0) of
+        eof ->
+            erase(?MODULE),
+            Lines0;
         {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
             %% ?D("~p: ~s",[LineNr, array:get(LineNr, Lines0)]),
-            ToCol = indent(LineNr, FormTokens, Prefs),
+            {LineNr, ToCol} = indent(FormTokens, LineNr0, Stop),
             {Changed, L} = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
             case LastLoc of
                 {LineNr, _} when Changed ->
@@ -98,28 +102,6 @@ do_indent_lines(LineNr, Tokens0, Lines0, Prefs) ->
                 _ ->
                     do_indent_lines(LineNr+1, Tokens0, Lines0, Prefs)
             end
-    end.
-
-pref(Key, Prefs) ->
-    lists:keyfind(Key, 1, Prefs).
-
-indent(LineN, Tokens, Prefs) ->
-    I = #i{anchor=[], indent_line=LineN, current=none},
-    try
-        i_form_list(Tokens, I),
-        pref(indentW, Prefs)
-    catch
-        throw:{indent, A, C} ->
-            get_indent_of(A, C, Prefs);
-        throw:{indent_eof, A, C} ->
-            get_indent_of(A, C, Prefs);
-        throw:{indent_to, N} ->
-            N;
-        error:_E ->
-            ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
-               [?MODULE, ?LINE, LineN, _E, 20, erlang:get_stacktrace(), 20]),
-            ?D(error(parse_error)),
-            0
     end.
 
 split_lines(Str) ->
@@ -209,27 +191,45 @@ entab(S, true, Tablength) ->
     {true, lists:append([lists:duplicate($\t, N div Tablength),
                          lists:duplicate($\s, N rem Tablength), Line])}.
 
+spaces("\n") -> ignore;
+spaces("\r\n") -> ignore;
+spaces(Str) ->
+    spaces(Str, 0).
+
+spaces([$\s|R], N) ->
+    spaces(R, N+1);
+spaces(_, N) -> N.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-i_check_aux([?line(L)| _],
-            #i{indent_line=IL, anchor=A, current=C})
-  when L >= IL ->
-    {indent, A, C};
-i_check_aux([?k(eof) | _], #i{anchor=A, current=C}) ->
-    {indent_eof, A, C};
-i_check_aux([eof | _], #i{anchor=A, current=C}) ->
-    {indent_eof, A, C};
-i_check_aux([], I) ->
-    i_check_aux([eof], I);
-i_check_aux(_, _) ->
-    not_yet.
+%% TODO: value 4 is hardcoded! Should use indentation width here
+indent(Tokens, Line, Fun) ->
+    I = #i{anchor=[], current=none, indent_line=Line, check=Fun},
+    try
+        i_form_list(Tokens, I)
+    catch
+        throw:{indent, Res} -> Res
+    end.
 
-i_check(T, I) ->
-    case i_check_aux(T, I) of
-        not_yet ->
-            not_yet;
-        Throw ->
-            throw(Throw)
+%% Uses process dictionary for storing the last checked LINE number it
+%% really should be in I#i{} record but that is not contained when parsing the
+%% code, so it's a large update to fix that.
+check_indent_lines(eof, A, C, _Lines, Prefs) ->
+    ToCol = get_indent_of(A, C, Prefs),
+    throw({indent, {get(?MODULE), ToCol}});
+check_indent_lines(Line, A, C, Lines, Prefs) ->
+    case Line < get(?MODULE) of
+        true -> ok;
+        false ->
+            ToCol = get_indent_of(A, C, Prefs),
+            SrcLine = array:get(Line, Lines),
+            case spaces(SrcLine) of
+                ignore -> put(?MODULE, Line+1);
+                ToCol -> put(?MODULE, Line+1);
+                _ ->
+                    %% ?D("~4.w: ~2w |~ts", [Line, ToCol, SrcLine]),
+                    throw({indent, {Line, ToCol}})
+            end
     end.
 
 indent_by(none, _) -> 0;
@@ -278,6 +278,23 @@ keep_one(Until, #i{anchor=[{_,_}|As]} = I) ->
 
 top(#i{anchor=[Top|_]}) ->
     Top.
+
+i_check([?line(Line)|_], #i{check=Check, anchor=A, current=C}) ->
+    Check(Line, A, C);
+i_check([], #i{check=Check, anchor=A, current=C}) ->
+    Check(eof, A, C).
+
+i_form_list(R0, I) ->
+    R = try i_form(R0, I)
+        catch error:_E ->
+                ?line(Line) = hd(R0),
+                #i{indent_line=IL, anchor=A, current=C} = I,
+                ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
+                   [?MODULE, ?LINE, Line, _E, 20, erlang:get_stacktrace(), 20]),
+                ?D(error(parse_error)),
+                IL({parse_error, Line}, A, C)
+        end,
+    i_form_list(R, I).
 
 i_expr([], I, _A) ->
     {[], I};
@@ -838,10 +855,6 @@ i_end_paren(R0, I0, A) ->
 
 i_end_paren_1([?k(Kind) | _] = R, I) when Kind==')'; Kind=='}'; Kind==']'; Kind==eof ->
     i_kind(Kind, R, I).
-
-i_form_list(R0, I) ->
-    R = i_form(R0, I),
-    i_form_list(R, I).
 
 i_form(R0, I) ->
     R1 = i_comments(R0, I),
