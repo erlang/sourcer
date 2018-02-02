@@ -1,0 +1,10 @@
+%% -*- erlang -*-
+%%
+%% Test different parse or syntax errors.
+%%
+
+%% This one caused an eternal loop in the parser
+forever(1) ->
+    foo
+end.
+

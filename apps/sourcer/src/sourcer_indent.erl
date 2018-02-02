@@ -87,16 +87,17 @@ do_indent_lines(LineNr0, Tokens0, Lines0, Prefs) ->
             Lines0;
         {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
             %% ?D("~p: ~s",[LineNr, array:get(LineNr, Lines0)]),
-            {LineNr, ToCol} = indent(FormTokens, LineNr0, Stop),
-            {Changed, L} = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
+            {IndLine, ToCol} = indent(FormTokens, LineNr0, Stop),
+            {Changed, L} = reindent_line(array:get(IndLine, Lines0), ToCol, Prefs),
+            LineNr = max(IndLine, LineNr0),
             case LastLoc of
                 {LineNr, _} when Changed ->
-                    Lines = array:set(LineNr, L, Lines0),
+                    Lines = array:set(IndLine, L, Lines0),
                     do_indent_lines(LineNr+1, Tokens, Lines, Prefs);
                 {LineNr, _} ->
                     do_indent_lines(LineNr+1, Tokens, Lines0, Prefs);
                 _ when Changed ->
-                    Lines = array:set(LineNr, L, Lines0),
+                    Lines = array:set(IndLine, L, Lines0),
                     ReScan = rescan_form(Form, Lines),
                     do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs);
                 _ ->
@@ -214,10 +215,8 @@ indent(Tokens, Line, Fun) ->
 %% Uses process dictionary for storing the last checked LINE number it
 %% really should be in I#i{} record but that is not contained when parsing the
 %% code, so it's a large update to fix that.
-check_indent_lines(eof, A, C, _Lines, Prefs) ->
-    ToCol = get_indent_of(A, C, Prefs),
-    throw({indent, {get(?MODULE), ToCol}});
-check_indent_lines(Line, A, C, Lines, Prefs) ->
+check_indent_lines(Line, A, C, Lines, Prefs)
+  when is_integer(Line) ->
     case Line < get(?MODULE) of
         true -> ok;
         false ->
@@ -230,7 +229,19 @@ check_indent_lines(Line, A, C, Lines, Prefs) ->
                     %% ?D("~4.w: ~2w |~ts", [Line, ToCol, SrcLine]),
                     throw({indent, {Line, ToCol}})
             end
-    end.
+    end;
+check_indent_lines(eof, A, C, _Lines, Prefs) ->
+    ToCol = get_indent_of(A, C, Prefs),
+    throw({indent, {get(?MODULE), ToCol}});
+check_indent_lines({parse_error, Line}, _, _, _, _) ->
+    throw({indent, {Line, 0}}).
+
+i_check([?line(Line)|_], #i{check=Check, anchor=A, current=C}) ->
+    Check(Line, A, C);
+i_check([], #i{check=Check, anchor=A, current=C}) ->
+    Check(eof, A, C);
+i_check(Other, #i{check=Check, anchor=A, current=C}) ->
+    Check(Other, A, C).
 
 indent_by(none, _) -> 0;
 indent_by(Key, Prefs) ->
@@ -246,12 +257,6 @@ get_indent_of([{What, ?col(CA)}=_A|_], C, Prefs) when is_atom(What), is_atom(C) 
     Col0+Extra-1;
 get_indent_of([], _, _) ->
     0.
-
-head([H | _]) -> H;
-head(H) -> H.
-
-i_with(W, I) ->
-    I#i{current=W}.
 
 push(Tag, #i{anchor=[{_,A0}|As]} = I) ->
     I#i{current=none, anchor=[{Tag, A0}|As]}.
@@ -276,25 +281,32 @@ keep_one({_, A}, #i{anchor=[{_,_},{_,A}|_]} = I) ->
 keep_one(Until, #i{anchor=[{_,_}|As]} = I) ->
     keep_one(Until, I#i{anchor=As}).
 
+i_with(W, I) ->
+    I#i{current=W}.
+
+head([H | _]) -> H;
+head(H) -> H.
+
 top(#i{anchor=[Top|_]}) ->
     Top.
 
-i_check([?line(Line)|_], #i{check=Check, anchor=A, current=C}) ->
-    Check(Line, A, C);
-i_check([], #i{check=Check, anchor=A, current=C}) ->
-    Check(eof, A, C).
-
-i_form_list(R0, I) ->
+i_form_list([?line(Line)|_] = R0, I) ->
     R = try i_form(R0, I)
         catch error:_E ->
-                ?line(Line) = hd(R0),
-                #i{indent_line=IL, anchor=A, current=C} = I,
                 ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
                    [?MODULE, ?LINE, Line, _E, 20, erlang:get_stacktrace(), 20]),
                 ?D(error(parse_error)),
-                IL({parse_error, Line}, A, C)
+                i_check({parse_error, Line}, I)
         end,
-    i_form_list(R, I).
+    case R of
+        R0 -> %% We are looping something is wrong
+            i_check({parse_error, Line}, I);
+        _ ->
+            i_form_list(R, I)
+    end;
+i_form_list([], I) ->
+    i_check([], I).
+
 
 i_expr([], I, _A) ->
     {[], I};
