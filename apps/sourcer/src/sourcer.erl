@@ -234,8 +234,12 @@
     Res = #{changes => []},
     Reporter({value, Res}).
 
-'textDocument/formatting'(_State, #{textDocument:=#{uri:=_URI}}, Reporter) ->
-    Res = [],
+'textDocument/formatting'(State, #{textDocument:=#{uri:=URI}, options:=Options}, Reporter) ->
+    #{tabSize:=TabSize, insertSpaces:=InsertSpaces} = Options,
+    Text = sourcer_documents:get_text(State#state.open_files, URI),
+    NewText = sourcer_indent:lines(unicode:characters_to_list(Text)),
+    Res = [#{range=>range({{0,1},{9991, 1}}),
+            newText=>unicode:characters_to_binary(NewText)}],
     Reporter({value, Res}).
 
 'textDocument/rangeFormatting'(_State, _Args, Reporter) ->

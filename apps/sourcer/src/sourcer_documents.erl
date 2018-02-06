@@ -35,8 +35,12 @@ update_file(Open, _URI, _Changes) ->
     Open.
 
 get_text(State, URI) ->
-    {URI, Text, _Data} = lists:keyfind(URI, 1, State),
-    Text.
+    case lists:keyfind(URI, 1, State) of
+        {URI, Text, _} ->
+            Text;
+        false ->
+            not_found
+    end.
 
 get_model(State, URI) ->
     case lists:keyfind(URI, 1, State) of
@@ -49,9 +53,7 @@ get_model(State, URI) ->
 parse_file(File, Text) ->
     TText = unicode:characters_to_list(Text),
     Mod = list_to_atom(unicode:characters_to_list(File)),
-    {ok, Toks, _} = sourcer_scan:string(TText),
-    Forms = sourcer_parse:parse(Toks),
-    Db = sourcer_db:analyze(Forms),
+    Db = sourcer_db:analyse_text(TText),
     Db.
 
 process_file(URI, Text) ->
