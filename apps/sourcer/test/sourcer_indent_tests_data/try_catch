@@ -44,14 +44,14 @@ try_catch() ->
         foo(bar)
     of
         X when true andalso
-              kalle -> %% Differ Emacs align inconsistent
+               kalle ->
             io:format(stdout, "Parsing file ~s, ",
                       [St0#leex.xfile]),
             {ok,Line3,REAs,Actions,St3} =
                 parse_rules(Xfile, Line2, Macs, St2);
         X
-          when false andalso			% when should be 2 indented
-              bengt -> %% Differ Emacs align inconsistent
+          when false andalso
+               bengt ->
             gurka();
         X when
               false andalso			% line should be 2 indented
@@ -94,7 +94,7 @@ indent_catch() ->
     B = catch oskar(X),
 
     A = catch (baz +
-               bax),   %% Differ Emacs align inconsistent
+               bax),
     catch foo(),
 
     C = catch B +
