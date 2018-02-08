@@ -201,6 +201,16 @@ spaces([$\s|R], N) ->
     spaces(R, N+1);
 spaces(_, N) -> N.
 
+newlines(Str) ->
+    newlines(Str, 0).
+
+newlines([$\n|Str], N) ->
+    newlines(Str, N+1);
+newlines([_|Str], N) ->
+    newlines(Str, N);
+newlines([], N) ->
+    N.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% TODO: value 4 is hardcoded! Should use indentation width here
@@ -215,20 +225,17 @@ indent(Tokens, Line, Fun) ->
 %% Uses process dictionary for storing the last checked LINE number it
 %% really should be in I#i{} record but that is not contained when parsing the
 %% code, so it's a large update to fix that.
-check_indent_lines(Line, A, C, Lines, Prefs)
-  when is_integer(Line) ->
+check_indent_lines({string,{Line,_},Str,_Str1}, A, C, Lines, Prefs) ->
+    NLs = newlines(Str),  %% Count NewLines it may be a multiline string
+    Wanted = get(?MODULE),
+    case Line <  Wanted of
+        true -> put(?MODULE, max(Wanted, Line+NLs+1));
+        false -> skip_or_indent(Line, NLs, get_indent_of(A, C, Prefs), Lines)
+    end;
+check_indent_lines(?line(Line), A, C, Lines, Prefs) ->
     case Line < get(?MODULE) of
         true -> ok;
-        false ->
-            ToCol = get_indent_of(A, C, Prefs),
-            SrcLine = array:get(Line, Lines),
-            case spaces(SrcLine) of
-                ignore -> put(?MODULE, Line+1);
-                ToCol -> put(?MODULE, Line+1);
-                _ ->
-                    %% ?D("~4.w: ~2w |~ts", [Line, ToCol, SrcLine]),
-                    throw({indent, {Line, ToCol}})
-            end
+        false -> skip_or_indent(Line, 0, get_indent_of(A, C, Prefs), Lines)
     end;
 check_indent_lines(eof, A, C, _Lines, Prefs) ->
     ToCol = get_indent_of(A, C, Prefs),
@@ -236,8 +243,18 @@ check_indent_lines(eof, A, C, _Lines, Prefs) ->
 check_indent_lines({parse_error, Line}, _, _, _, _) ->
     throw({indent, {Line, 0}}).
 
-i_check([?line(Line)|_], #i{check=Check, anchor=A, current=C}) ->
-    Check(Line, A, C);
+skip_or_indent(Line, NewLines, ToCol, Src) ->
+    SrcLine = array:get(Line, Src),
+    case spaces(SrcLine) of
+        ignore -> put(?MODULE, Line+NewLines+1);
+        ToCol -> put(?MODULE, Line+NewLines+1);
+        _ ->
+            %% ?D("~4.w: ~2w |~ts", [Line, ToCol, SrcLine]),
+            throw({indent, {Line, ToCol}})
+    end.
+
+i_check([Head|_], #i{check=Check, anchor=A, current=C}) ->
+    Check(Head, A, C);
 i_check([], #i{check=Check, anchor=A, current=C}) ->
     Check(eof, A, C);
 i_check(Other, #i{check=Check, anchor=A, current=C}) ->
