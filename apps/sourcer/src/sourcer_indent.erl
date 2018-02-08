@@ -59,7 +59,7 @@ lines(S) ->
 
 lines(S, Prefs) ->
     Tokens = sourcer_scan:tokens(S),
-    Lines = array:from_list(split_lines(S)),
+    Lines = array:from_list(sourcer_scan:split_lines(S)),
     Ls = do_indent_lines(0, Tokens, Lines, get_prefs(Prefs)),
     unicode:characters_to_list(array:to_list(Ls)).
 
@@ -88,44 +88,22 @@ do_indent_lines(LineNr0, Tokens0, Lines0, Prefs) ->
         {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
             %% ?D("~p: ~s",[LineNr, array:get(LineNr, Lines0)]),
             {IndLine, ToCol} = indent(FormTokens, LineNr0, Stop),
-            {Changed, L} = reindent_line(array:get(IndLine, Lines0), ToCol, Prefs),
             LineNr = max(IndLine, LineNr0),
+            {Changed, L} = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
             case LastLoc of
                 {LineNr, _} when Changed ->
-                    Lines = array:set(IndLine, L, Lines0),
+                    Lines = array:set(LineNr, L, Lines0),
                     do_indent_lines(LineNr+1, Tokens, Lines, Prefs);
                 {LineNr, _} ->
                     do_indent_lines(LineNr+1, Tokens, Lines0, Prefs);
                 _ when Changed ->
-                    Lines = array:set(IndLine, L, Lines0),
+                    Lines = array:set(LineNr, L, Lines0),
                     ReScan = rescan_form(Form, Lines),
                     do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs);
                 _ ->
                     do_indent_lines(LineNr+1, Tokens0, Lines0, Prefs)
             end
     end.
-
-split_lines(Str) ->
-    split_lines(Str, []).
-
-split_lines([$$, C| Rest], Line) ->
-    split_lines(Rest, [C, $$|Line]);
-split_lines([$%|Rest], Line) ->
-    until_nl(Rest, [$%|Line]);
-split_lines("\n" ++ Rest, Line) ->
-    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
-split_lines([C|Rest], Line) ->
-    split_lines(Rest, [C|Line]);
-split_lines([], Line) ->
-    [lists:reverse(Line)].
-
-%% Needed to handle commented lines that end with '$'
-until_nl("\n" ++ Rest, Line) ->
-    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
-until_nl([C|Rest], Line) ->
-    until_nl(Rest, [C|Line]);
-until_nl([], Line) ->
-    [lists:reverse(Line)].
 
 fetch_form(Line, [{_, _, {End, _}}=Form|Rest])
   when Line =< End ->

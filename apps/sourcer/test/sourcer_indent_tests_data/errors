@@ -8,3 +8,19 @@ forever(1) ->
     foo
 end.
 
+
+%% Check that we can handle scanner errors in some way
+
+scanner_errors() ->
+    Float = 6.28e1,
+    HalfFinishedFloat = 2.3e,
+ok.
+
+%% This needs to be last: uncompleted string
+
+uncomplete() ->
+    foo(),
+    UntilEof = "1
+2
+3
+ok.
