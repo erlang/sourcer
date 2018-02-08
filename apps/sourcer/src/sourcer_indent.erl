@@ -79,30 +79,31 @@ get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
 do_indent_lines(LineNr0, Tokens0, Lines0, Prefs) ->
-    put(?MODULE, LineNr0),
-    Stop = fun(Line, A, C) -> check_indent_lines(Line, A, C, Lines0, Prefs) end,
     case fetch_form(LineNr0, Tokens0) of
         eof ->
             erase(?MODULE),
             Lines0;
-        {{FormTokens, _Start, LastLoc} = Form, Tokens} ->
-            %% ?D("~p: ~s",[LineNr, array:get(LineNr, Lines0)]),
-            {IndLine, ToCol} = indent(FormTokens, LineNr0, Stop),
-            LineNr = max(IndLine, LineNr0),
-            {Changed, L} = reindent_line(array:get(LineNr, Lines0), ToCol, Prefs),
-            case LastLoc of
-                {LineNr, _} when Changed ->
-                    Lines = array:set(LineNr, L, Lines0),
-                    do_indent_lines(LineNr+1, Tokens, Lines, Prefs);
-                {LineNr, _} ->
-                    do_indent_lines(LineNr+1, Tokens, Lines0, Prefs);
-                _ when Changed ->
-                    Lines = array:set(LineNr, L, Lines0),
-                    ReScan = rescan_form(Form, Lines),
-                    do_indent_lines(LineNr+1, [ReScan|Tokens], Lines, Prefs);
-                _ ->
-                    do_indent_lines(LineNr+1, Tokens0, Lines0, Prefs)
-            end
+        {Form, Tokens} ->
+            put(?MODULE, LineNr0),
+            Stop = fun(Line, A, C) ->
+                           check_indent_lines(Line, A, C, Lines0, Prefs)
+                   end,
+            Indent = indent(Form, LineNr0, Stop),
+            do_indent_cont(Indent, LineNr0, Lines0, Form, Tokens, Prefs)
+    end.
+
+do_indent_cont({eof, LineNr, _Col}, _Nr, Lines0, _Form, Forms, Prefs) ->
+    do_indent_lines(LineNr, Forms, Lines0, Prefs);
+do_indent_cont({IndLine, ToCol}, LineNr0, Lines0, Form0, Forms, Prefs) ->
+    %% IndLine is less then LineNr0 if scan_error
+    LineNr = max(IndLine, LineNr0),
+    {Changed, Lines} = reindent_line(LineNr, Lines0, ToCol, Prefs),
+    case Form0 of
+        {_, _, {LineNr,_}} ->
+            do_indent_lines(LineNr+1, Forms, Lines, Prefs);
+       _ ->
+            Form = update_line_tokens(Changed, LineNr, ToCol, Form0),
+            do_indent_lines(LineNr+1, [Form|Forms], Lines, Prefs)
     end.
 
 fetch_form(Line, [{_, _, {End, _}}=Form|Rest])
@@ -113,29 +114,34 @@ fetch_form(Line, [_|Rest]) ->
 fetch_form(_, []) ->
     eof.
 
-%% rescan after indentation so we get the new locations on the tokens
-rescan_form({_, {FromLine, _}=Loc, {LastLine,_}}, Lines) ->
-    Src = fetch_lines(Lines, LastLine, FromLine, []),
-    pick_form(sourcer_scan:tokens(Src, Loc, LastLine), FromLine, LastLine).
-
-%% pick the form we re-scanned most often the first but if form starts on
-%% previous lines form it can be wrong, most often a comment after dot
-pick_form([{_, {FromLine, _}, {LastLine, _}}=Form|_], FromLine, LastLine) ->
+update_line_tokens(false, _LineNr, _Col, Form) ->
     Form;
-pick_form([_|T], FromLine, LastLine) ->
-    pick_form(T, FromLine, LastLine).
+update_line_tokens(true, LineNr, Col, {Tokens, Start, End}) ->
+    {update_token_1(Tokens, LineNr, Col+1), Start, End}.
 
-fetch_lines(Lines, NextLine, First, Acc)
-  when NextLine >= First ->
-    Src = array:get(NextLine, Lines) ++ Acc,
-    fetch_lines(Lines, NextLine-1, First, Src);
-fetch_lines(_Lines, _NextLine, _First, Acc) ->
-    Acc.
+update_token_1([{T,{LineNr,FromCol},S,V}=_Tok|Rest], LineNr, Col) ->
+    [{T,{LineNr,Col},S,V}|update_token_line(Rest, LineNr, Col-FromCol)];
+update_token_1([T|Rest], LineNr, Col) ->
+    [T|update_token_1(Rest,LineNr,Col)];
+update_token_1([], _, _) ->
+    [].
+
+update_token_line([{T,{LineNr,Col},S,V}=_Tok|Rest], LineNr, Move) ->
+    [{T,{LineNr,Col+Move},S,V}|update_token_line(Rest, LineNr, Move)];
+update_token_line(OtherLines, _, _) ->
+    OtherLines.
 
 %%
-reindent_line("\n"=L, _, _) -> {false, L};
-reindent_line("\r\n"=L, _, _) -> {false, L};
-reindent_line(Line, N, Prefs) ->
+reindent_line(LineNr, Lines, Col, Prefs) ->
+    Src = array:get(LineNr, Lines),
+    case reindent_line_0(Src, Col, Prefs) of
+        {true, New} -> {true, array:set(LineNr, New, Lines)};
+        {false, _} -> {false, Lines}
+    end.
+
+reindent_line_0("\n"=L, _, _) -> {false, L};
+reindent_line_0("\r\n"=L, _, _) -> {false, L};
+reindent_line_0(Line, N, Prefs) ->
     {Changed, L} =
         case reindent_line_1(Line, N, 0) of
             false -> {false, Line};
@@ -192,7 +198,7 @@ newlines([], N) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% TODO: value 4 is hardcoded! Should use indentation width here
-indent(Tokens, Line, Fun) ->
+indent({Tokens,_,_}, Line, Fun) ->
     I = #i{anchor=[], current=none, indent_line=Line, check=Fun},
     try
         i_form_list(Tokens, I)
@@ -217,7 +223,7 @@ check_indent_lines(?line(Line), A, C, Lines, Prefs) ->
     end;
 check_indent_lines(eof, A, C, _Lines, Prefs) ->
     ToCol = get_indent_of(A, C, Prefs),
-    throw({indent, {get(?MODULE), ToCol}});
+    throw({indent, {eof, get(?MODULE), ToCol}});
 check_indent_lines({parse_error, Line}, _, _, _, _) ->
     throw({indent, {Line, 0}}).
 

@@ -16,7 +16,7 @@ indent_test_() ->
     {setup, 
         fun()-> ok end,
         fun(_)-> 
-            [file:delete(File) || {_, File} <- Res],
+            [file:delete(File) || {ok, File} <- Res],
             ok
         end,
         [?_assertMatch({ok, _}, Result) || Result <- Res]
@@ -26,7 +26,12 @@ unindent(Input) ->
     Output = Input ++ ".actual",
     {ok, Bin} = file:read_file(Input),
     Lines0 = string:split(Bin, "\n", all),
-    Lines = [string:trim(Line, leading, [$\s,$\t]) || Line <- Lines0],
+    %% We leave one space, so we can show errors that should indent to col 0
+    AddOne = fun(<<>>) -> <<>>;
+                (<<"row", _/binary>>=Row) -> Row;
+                (Str) -> [$\s|Str]
+             end,
+    Lines = [AddOne(string:trim(Line, leading, [$\s,$\t])) || Line <- Lines0],
     %% io:format("File: ~s lines: ~w~n", [Input, length(Lines0)]),
     %% [io:format("~s~n", [L]) || L <- Lines],
     ok = file:write_file(Output, lists:join("\n", Lines)),
