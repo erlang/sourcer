@@ -19,6 +19,7 @@
 -define(kv(K,V), {K,_,_,V}).
 -define(line(X), {_,{X,_},_,_}).
 -define(col(X), {_,{_,X},_,_}).
+-define(loc(X), {_,X,_,_}).
 
 %% TODO: change into multiples of IndentW
 default_indent_prefs() ->
@@ -57,10 +58,14 @@ default_indent_prefs() ->
 lines(S) ->
     lines(S, []).
 
-lines(S, Prefs) ->
+lines(S, Prefs0) ->
     Tokens = sourcer_scan:tokens(S),
     Lines = array:from_list(sourcer_scan:split_lines(S)),
-    Ls = do_indent_lines(0, Tokens, Lines, get_prefs(Prefs)),
+    Prefs = get_prefs(Prefs0),
+    Stop = fun(Line, A, C) ->
+                   check_indent_lines(Line, A, C, Prefs)
+           end,
+    Ls = do_indent_lines(0, Tokens, Lines, Stop, Prefs),
     unicode:characters_to_list(array:to_list(Ls)).
 
 %%
@@ -78,32 +83,31 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
 get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
-do_indent_lines(LineNr0, Tokens0, Lines0, Prefs) ->
+do_indent_lines(LineNr0, Tokens0, Lines0, Stop, Prefs) ->
     case fetch_form(LineNr0, Tokens0) of
         eof ->
             erase(?MODULE),
             Lines0;
-        {Form, Tokens} ->
+        {Form, Tokens1} ->
             put(?MODULE, LineNr0),
-            Stop = fun(Line, A, C) ->
-                           check_indent_lines(Line, A, C, Lines0, Prefs)
-                   end,
             Indent = indent(Form, LineNr0, Stop),
-            do_indent_cont(Indent, LineNr0, Lines0, Form, Tokens, Prefs)
+            {LineNr, Forms, Lines} =
+                do_indent_cont(Indent, LineNr0, Lines0, Form, Tokens1, Prefs),
+            do_indent_lines(LineNr, Forms, Lines, Stop, Prefs)
     end.
 
-do_indent_cont({eof, LineNr, _Col}, _Nr, Lines0, _Form, Forms, Prefs) ->
-    do_indent_lines(LineNr, Forms, Lines0, Prefs);
+do_indent_cont({eof, LineNr, _Col}, _Nr, Lines0, _Form, Forms, _Prefs) ->
+    {LineNr, Forms, Lines0};
 do_indent_cont({IndLine, ToCol}, LineNr0, Lines0, Form0, Forms, Prefs) ->
     %% IndLine is less then LineNr0 if scan_error
     LineNr = max(IndLine, LineNr0),
     {Changed, Lines} = reindent_line(LineNr, Lines0, ToCol, Prefs),
     case Form0 of
         {_, _, {LineNr,_}} ->
-            do_indent_lines(LineNr+1, Forms, Lines, Prefs);
+            {LineNr+1, Forms, Lines};
        _ ->
             Form = update_line_tokens(Changed, LineNr, ToCol, Form0),
-            do_indent_lines(LineNr+1, [Form|Forms], Lines, Prefs)
+            {LineNr+1, [Form|Forms], Lines}
     end.
 
 fetch_form(Line, [{_, _, {End, _}}=Form|Rest])
@@ -176,15 +180,6 @@ entab(S, true, Tablength) ->
     {true, lists:append([lists:duplicate($\t, N div Tablength),
                          lists:duplicate($\s, N rem Tablength), Line])}.
 
-spaces("\n") -> ignore;
-spaces("\r\n") -> ignore;
-spaces(Str) ->
-    spaces(Str, 0).
-
-spaces([$\s|R], N) ->
-    spaces(R, N+1);
-spaces(_, N) -> N.
-
 newlines(Str) ->
     newlines(Str, 0).
 
@@ -209,33 +204,29 @@ indent({Tokens,_,_}, Line, Fun) ->
 %% Uses process dictionary for storing the last checked LINE number it
 %% really should be in I#i{} record but that is not contained when parsing the
 %% code, so it's a large update to fix that.
-check_indent_lines({string,{Line,_},Str,_Str1}, A, C, Lines, Prefs) ->
+check_indent_lines({string,{Line,Col},Str,_Str1}, A, C, Prefs) ->
     NLs = newlines(Str),  %% Count NewLines it may be a multiline string
     Wanted = get(?MODULE),
     case Line <  Wanted of
         true -> put(?MODULE, max(Wanted, Line+NLs+1));
-        false -> skip_or_indent(Line, NLs, get_indent_of(A, C, Prefs), Lines)
+        false -> skip_or_indent(Line, Col-1, get_indent_of(A, C, Prefs), NLs)
     end;
-check_indent_lines(?line(Line), A, C, Lines, Prefs) ->
+check_indent_lines(?loc({Line,Col}), A, C, Prefs) ->
     case Line < get(?MODULE) of
         true -> ok;
-        false -> skip_or_indent(Line, 0, get_indent_of(A, C, Prefs), Lines)
+        false -> skip_or_indent(Line, Col-1, get_indent_of(A, C, Prefs), 0)
     end;
-check_indent_lines(eof, A, C, _Lines, Prefs) ->
+check_indent_lines(eof, A, C, Prefs) ->
     ToCol = get_indent_of(A, C, Prefs),
     throw({indent, {eof, get(?MODULE), ToCol}});
-check_indent_lines({parse_error, Line}, _, _, _, _) ->
+check_indent_lines({parse_error, Line}, _, _, _) ->
     throw({indent, {Line, 0}}).
 
-skip_or_indent(Line, NewLines, ToCol, Src) ->
-    SrcLine = array:get(Line, Src),
-    case spaces(SrcLine) of
-        ignore -> put(?MODULE, Line+NewLines+1);
-        ToCol -> put(?MODULE, Line+NewLines+1);
-        _ ->
-            %% ?D("~4.w: ~2w |~ts", [Line, ToCol, SrcLine]),
-            throw({indent, {Line, ToCol}})
-    end.
+skip_or_indent(Line, Col, Col, NewLines) ->
+    put(?MODULE, Line+NewLines+1);
+skip_or_indent(Line, _Col, ToCol, _NewLines) ->
+    %% ?D("~4.w: ~2w ~2w~n", [Line, _Col, ToCol]),
+    throw({indent, {Line, ToCol}}).
 
 i_check([Head|_], #i{check=Check, anchor=A, current=C}) ->
     Check(Head, A, C);
