@@ -12,14 +12,18 @@ indent_test_() ->
                                     filename:extension(File) =:= ""],
     Indent = fun sourcer/1,
     [Indent(File) || {_, File} <- Fs],
-    Res = [diff(Orig, File) || {Orig, File} <- Fs],
-    {setup, 
-        fun()-> ok end,
-        fun(_)-> 
-            [file:delete(File) || {ok, File} <- Res],
-            ok
-        end,
-        [?_assertMatch({ok, _}, Result) || Result <- Res]
+    Res = [diff(Orig, File, 1) || {Orig, File} <- Fs],
+    %% And do the indentation again to see that nothing have changed
+    [Indent(File) || {_, File} <- Fs],
+    Res2 = [diff(Orig, File, 2) || {Orig, File} <- Fs],
+    {setup,
+     fun()-> ok end,
+     fun(_)->  %% Keep failed files to ease debugging
+             [file:delete(File) || {ok, File} <- Res],
+             ok
+     end,
+     [?_assertMatch({ok, _}, Result) || Result <- Res] ++
+         [?_assertMatch({ok, _}, Result) || Result <- Res2]
     }.
 
 unindent(Input) ->
@@ -37,12 +41,12 @@ unindent(Input) ->
     ok = file:write_file(Output, lists:join("\n", Lines)),
     Output.
 
-diff(Orig, File) ->
+diff(Orig, File, Pass) ->
     case os:cmd(["diff ", Orig, " ", File]) of
         "" -> {ok, File};
         Diff ->
             io:format(user, "Fail: ~s vs ~s~n~s~n~n",[Orig, File, Diff]),
-            {fail, File}
+            {{fail, Pass}, File}
     end.
 
 sourcer(File) ->

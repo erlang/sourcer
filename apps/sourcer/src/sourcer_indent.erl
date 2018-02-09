@@ -220,7 +220,7 @@ check_indent_lines(eof, A, C, Prefs) ->
     ToCol = get_indent_of(A, C, Prefs),
     throw({indent, {eof, get(?MODULE), ToCol}});
 check_indent_lines({parse_error, Line}, _, _, _) ->
-    throw({indent, {Line, 0}}).
+    throw({indent, {Line+1, 0}}).
 
 skip_or_indent(Line, Col, Col, NewLines) ->
     put(?MODULE, Line+NewLines+1);
@@ -312,14 +312,14 @@ i_expr(R0, I0, A) ->
                 string ->
                     i_expr(R2, I1, A);
                 _ ->
-                    i_expr_rest(R2, I1, top(I1))
+                    i_expr_rest(R2, I1, A)
             end;
         macro ->
             case i_sniff(i_kind(macro, R1, I1)) of
                 macro ->
                     i_expr(R2, push(after_op, I1), A);
                 _ ->
-                    i_expr_rest(R2, I1, top(I1))
+                    i_expr_rest(R2, I1, A)
             end;
         _ ->
             i_expr_rest(R2, I1, A)
@@ -369,7 +369,7 @@ i_expr_rest(R0, I, A) ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
                     {Anchor, _} = A,
-                    Align = [after_op, 'after_when', clause, paren],
+                    Align = [after_op, 'when', 'after_when', clause, paren],
                     I2 = case lists:member(Anchor, Align) of
                              true ->
                                  push(none, keep_one(A, I));
@@ -686,7 +686,7 @@ i_receive(R0, I1) ->
     R4 = case i_sniff(R2) of
              'after' ->
                  I3 = push('after', R2, I1),
-                 R3 = i_kind('after', R2, I1),
+                 R3 = i_kind('after', R2, push(none, I2)),
                  i_after_clause(R3, I3);
              _ ->
                  R2
@@ -927,7 +927,8 @@ i_type_fun(R0, I0) ->
     R6 = case i_sniff(R3) of
              '->' ->
                  R4 = i_kind('->', R3, I2),
-                 {R5, _} = i_spec_expr(R4, push(after_arrow, R3, I2), top(I2)),
+                 I3 = push(after_arrow, I1),
+                 {R5, _} = i_spec_expr(R4, I3, top(I3)),
                  R5;
              _ ->
                  R3
@@ -941,7 +942,8 @@ i_spec_expr(R0, I0, A0) ->
         'when' ->
             R11 = i_kind('when', R1, I1),
             I2 = pop_until(A0, I0),
-            i_spec_expr(R11, push(none, I2), top(I2));
+            {R2, _} = i_spec_expr(R11, push(none, I2), top(I2)),
+            {R2, I1};
         ',' ->
             R11 = i_kind(',', R1, push(delimiter_spec, I1)),
             I2 = keep_one(A0, I1),
@@ -954,7 +956,7 @@ i_spec_aux(R0, I0) ->
     {R1,I1} =
         case i_sniff(R0) of
             '(' ->
-                {R0, I0};
+                {R0, pop(I0)};
             _ ->
                 R10 = i_atom_or_macro(R0, I0),
                 case i_sniff(R10) of
@@ -965,8 +967,8 @@ i_spec_aux(R0, I0) ->
                         {R10, push(none, R0, I0)}
                 end
         end,
-    R2 = i_kind('(', R1, I1),
-    I2 = push(none, R1, I0),
+    R2 = i_kind('(', R1, I0),
+    I2 = push(none, R1, I1),
     {R3, _I2} = i_spec_expr(R2, I2, top(I2)),
     R4 = i_kind(')', R3, I2),
     case i_sniff(R4) of
@@ -983,9 +985,8 @@ i_spec_list(R0, I0, A0) ->
     {R1,I1} = i_spec_aux(R0, I0),
     case i_sniff(R1) of
         ';' ->
-            I2 = keep_one(A0, I1),
-            R2 = i_kind(';', R1, I2),
-            i_spec_list(R2, I2, A0);
+            R2 = i_kind(';', R1, push(delimiter_spec, I1)),
+            i_spec_list(R2, I1, A0);
         _ ->
             R1
     end.

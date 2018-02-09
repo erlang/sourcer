@@ -79,6 +79,12 @@ when4(W1,W2,W3)
       W2 > W3 ->
     ok.
 
+when5(W1,W2,W3)
+  when
+      W1 > W2 orelse
+      W2 > W3 ->
+    ok.
+
 match1({[H|T],
         Other},
        M1A2) ->
