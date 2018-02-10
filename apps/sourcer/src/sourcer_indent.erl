@@ -62,9 +62,7 @@ lines(S, Prefs0) ->
     Tokens = sourcer_scan:tokens(S),
     Lines = array:from_list(sourcer_scan:split_lines(S)),
     Prefs = get_prefs(Prefs0),
-    Stop = fun(Line, A, C) ->
-                   check_indent_lines(Line, A, C, Prefs)
-           end,
+    Stop = fun(Line, I) -> check_indent_lines(Line, I, Prefs) end,
     Ls = do_indent_lines(0, Tokens, Lines, Stop, Prefs),
     unicode:characters_to_list(array:to_list(Ls)).
 
@@ -72,7 +70,7 @@ lines(S, Prefs0) ->
 %% Local Functions
 %%
 
--record(i, {indent_line, anchor, current, check}).
+-record(i, {indent_line, anchor, current, check, skip}).
 
 get_prefs([], OldP, Acc) ->
     maps:from_list(Acc ++ OldP);
@@ -83,22 +81,22 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
 get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
-do_indent_lines(LineNr0, Tokens0, Lines0, Stop, Prefs) ->
-    case fetch_form(LineNr0, Tokens0) of
+do_indent_lines(LineNr0, Forms0, Lines0, Stop, Prefs) ->
+    case fetch_form(LineNr0, Forms0) of
         eof ->
             erase(?MODULE),
             Lines0;
-        {Form, Tokens1} ->
+        {Form, Forms1} ->
             put(?MODULE, LineNr0),
             Indent = indent(Form, LineNr0, Stop),
             {LineNr, Forms, Lines} =
-                do_indent_cont(Indent, LineNr0, Lines0, Form, Tokens1, Prefs),
+                do_indent_cont(Indent, LineNr0, Lines0, Form, Forms1, Prefs),
             do_indent_lines(LineNr, Forms, Lines, Stop, Prefs)
     end.
 
 do_indent_cont({eof, LineNr, _Col}, _Nr, Lines0, _Form, Forms, _Prefs) ->
     {LineNr, Forms, Lines0};
-do_indent_cont({IndLine, ToCol}, LineNr0, Lines0, Form0, Forms, Prefs) ->
+do_indent_cont({IndLine, ToCol, Skip}, LineNr0, Lines0, Form0, Forms, Prefs) ->
     %% IndLine is less then LineNr0 if scan_error
     LineNr = max(IndLine, LineNr0),
     {Changed, Lines} = reindent_line(LineNr, Lines0, ToCol, Prefs),
@@ -106,7 +104,7 @@ do_indent_cont({IndLine, ToCol}, LineNr0, Lines0, Form0, Forms, Prefs) ->
         {_, _, {LineNr,_}} ->
             {LineNr+1, Forms, Lines};
        _ ->
-            Form = update_line_tokens(Changed, LineNr, ToCol, Form0),
+            Form = update_line_tokens(Changed, Skip, LineNr, ToCol, Form0),
             {LineNr+1, [Form|Forms], Lines}
     end.
 
@@ -117,11 +115,20 @@ fetch_form(Line, [_|Rest]) ->
     fetch_form(Line, Rest);
 fetch_form(_, []) ->
     eof.
-
-update_line_tokens(false, _LineNr, _Col, Form) ->
+update_line_tokens(false, undefined, _LineNr, _Col, Form) ->
     Form;
-update_line_tokens(true, LineNr, Col, {Tokens, Start, End}) ->
-    {update_token_1(Tokens, LineNr, Col+1), Start, End}.
+update_line_tokens(true, undefined, LineNr, Col, {Tokens, Start, End}) ->
+    {update_token_1(Tokens, LineNr, Col+1), Start, End};
+update_line_tokens(Changed, Skip, LineNr, Col, {Tokens0, _, End}) ->
+    [Skip|Tokens] = lists:dropwhile(fun(T) -> Skip =/= T end, Tokens0),
+    case Tokens of
+        [] ->
+            {[], End, End};
+        [?loc(Start)|_] when not Changed ->
+            {Tokens, Start, End};
+        [?loc(Start)|_] ->
+            {update_token_1(Tokens, LineNr, Col+1), Start, End}
+    end.
 
 update_token_1([{T,{LineNr,FromCol},S,V}=_Tok|Rest], LineNr, Col) ->
     [{T,{LineNr,Col},S,V}|update_token_line(Rest, LineNr, Col-FromCol)];
@@ -204,50 +211,54 @@ indent({Tokens,_,_}, Line, Fun) ->
 %% Uses process dictionary for storing the last checked LINE number it
 %% really should be in I#i{} record but that is not contained when parsing the
 %% code, so it's a large update to fix that.
-check_indent_lines({string,{Line,Col},Str,_Str1}, A, C, Prefs) ->
+check_indent_lines({string,{Line,Col},Str,_Str1}, I, Prefs) ->
     NLs = newlines(Str),  %% Count NewLines it may be a multiline string
     Wanted = get(?MODULE),
     case Line <  Wanted of
         true -> put(?MODULE, max(Wanted, Line+NLs+1));
-        false -> skip_or_indent(Line, Col-1, get_indent_of(A, C, Prefs), NLs)
+        false -> skip_or_indent(Line, Col-1, get_indent_of(I, Prefs), NLs, I)
     end;
-check_indent_lines(?loc({Line,Col}), A, C, Prefs) ->
+check_indent_lines(?loc({Line,Col}), I, Prefs) ->
     case Line < get(?MODULE) of
         true -> ok;
-        false -> skip_or_indent(Line, Col-1, get_indent_of(A, C, Prefs), 0)
+        false -> skip_or_indent(Line, Col-1, get_indent_of(I, Prefs), 0, I)
     end;
-check_indent_lines(eof, A, C, Prefs) ->
-    ToCol = get_indent_of(A, C, Prefs),
+check_indent_lines(eof, I, Prefs) ->
+    ToCol = get_indent_of(I, Prefs),
     throw({indent, {eof, get(?MODULE), ToCol}});
-check_indent_lines({parse_error, Line}, _, _, _) ->
-    throw({indent, {Line+1, 0}}).
+check_indent_lines({parse_error, Line}, #i{skip=Skip}, _) ->
+    throw({indent, {Line+1, 0, Skip}}).
 
-skip_or_indent(Line, Col, Col, NewLines) ->
+skip_or_indent(Line, Col, Col, NewLines,_) ->
     put(?MODULE, Line+NewLines+1);
-skip_or_indent(Line, _Col, ToCol, _NewLines) ->
+skip_or_indent(Line, _Col, ToCol, _NewLines, #i{skip=Skip}) ->
     %% ?D("~4.w: ~2w ~2w~n", [Line, _Col, ToCol]),
-    throw({indent, {Line, ToCol}}).
+    throw({indent, {Line, ToCol, Skip}}).
 
-i_check([Head|_], #i{check=Check, anchor=A, current=C}) ->
-    Check(Head, A, C);
-i_check([], #i{check=Check, anchor=A, current=C}) ->
-    Check(eof, A, C);
-i_check(Other, #i{check=Check, anchor=A, current=C}) ->
-    Check(Other, A, C).
+i_check([Head|_], #i{check=Check}=I) ->
+    Check(Head, I);
+i_check([], #i{check=Check}=I) ->
+    Check(eof, I);
+i_check(Other, #i{check=Check}=I) ->
+    Check(Other, I).
 
 indent_by(none, _) -> 0;
 indent_by(Key, Prefs) ->
     maps:get(Key, Prefs, 0).
 
-get_indent_of([{What, ?col(CA)}=_A|_], {C, ?col(Exp)}, Prefs) when is_atom(What), is_atom(C) ->
+get_indent_of(#i{anchor=[{What, ?col(CA)}=_A|_],
+                 current={C, ?col(Exp)}}, Prefs)
+  when is_atom(What), is_atom(C) ->
     Col0 = CA+indent_by(What, Prefs),
     Extra = indent_by(C, Prefs),
     min(Col0+Extra, Exp)-1;
-get_indent_of([{What, ?col(CA)}=_A|_], C, Prefs) when is_atom(What), is_atom(C) ->
+get_indent_of(#i{anchor=[{What, ?col(CA)}=_A|_],
+                 current=C}, Prefs)
+  when is_atom(What), is_atom(C) ->
     Col0 = CA+indent_by(What, Prefs),
     Extra = indent_by(C, Prefs),
     Col0+Extra-1;
-get_indent_of([], _, _) ->
+get_indent_of(_, _) ->
     0.
 
 push(Tag, #i{anchor=[{_,A0}|As]} = I) ->
@@ -282,23 +293,20 @@ head(H) -> H.
 top(#i{anchor=[Top|_]}) ->
     Top.
 
-i_form_list([?line(Line)|_] = R0, I) ->
-    R = try i_form(R0, I)
-        catch error:_E ->
-                ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
-                   [?MODULE, ?LINE, Line, _E, 20, erlang:get_stacktrace(), 20]),
-                ?D(error(parse_error)),
-                i_check({parse_error, Line}, I)
-        end,
-    case R of
-        R0 -> %% We are looping something is wrong
-            i_check({parse_error, Line}, I);
-        _ ->
+i_form_list([?line(Line)|_] = R0, I0) ->
+    try i_form(R0, I0) of
+        {R0, _}  -> %% We are looping something is wrong
+            i_check({parse_error, Line}, I0);
+        {R, I} ->
             i_form_list(R, I)
+    catch error:_E ->
+            ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
+               [?MODULE, ?LINE, Line, _E, 20, erlang:get_stacktrace(), 20]),
+            ?D(error(parse_error)),
+            i_check({parse_error, Line}, I0)
     end;
 i_form_list([], I) ->
     i_check([], I).
-
 
 i_expr([], I, _A) ->
     {[], I};
@@ -873,10 +881,13 @@ i_form(R0, I) ->
 i_dot_or_semi(R, I) ->
     case i_sniff(R) of
         DS when DS==dot; DS==';' ->
-            i_kind(DS, R, I);
+            {i_kind(DS, R, I), I#i{skip=hd(R)}};
         _ ->
-            R
+            {R, I}
     end.
+
+i_dot(R, I) ->
+    {i_kind(dot, R, I), I#i{skip=hd(R)}}.
 
 i_declaration(R0, I) ->
     i_check(R0, I),
@@ -893,12 +904,12 @@ i_declaration(R0, I) ->
             i_macro_def(R2, push(clause, R1, I));
         _ ->
             {R2, _A} = i_expr(R1, push(none, R1, I), head(R0)),
-            i_kind(dot, R2, I)
+            i_dot(R2, I)
     end.
 
 i_typedef(R0, I0) ->
     {R1, _I1} = i_expr(R0, I0, top(I0)),
-    i_kind(dot, R1, I0).
+    i_dot(R1, I0).
 
 i_type(R0, I0, A0) ->
     {R1, I1} = case i_sniff(R0) of
@@ -1001,7 +1012,7 @@ i_spec(R0, I) ->
             _ ->
 		i_spec_list(R0, I, top(I))
 	end,
-    i_dot_or_semi(R, I).
+    i_dot(R, I).
 
 i_macro_def(R0, I0) ->
     R1 = i_kind('(', R0, I0),
@@ -1011,7 +1022,7 @@ i_macro_def(R0, I0) ->
     R3 = i_kind(',', R2, I1),
     {R4, I3} = i_macro_exp(R3, I2, top(I1)),
     R5 = i_end_paren(R4, I3, top(I1)),
-    i_kind('dot', R5, I0).
+    i_dot(R5, I0).
 
 i_macro_exp(R0, I0, A0) ->
     {R1, I1} = i_expr(R0, I0, A0),

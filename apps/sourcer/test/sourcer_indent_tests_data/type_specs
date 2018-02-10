@@ -100,7 +100,7 @@
 -spec get_closest_pid(term()) ->
           Return :: pid()
                   | {'error', {'no_process', term()}}
-                  | {'no_such_group', term()}}.
+                  | {'no_such_group', term()}.
 
 -spec add( X :: integer()
          , Y :: integer()
