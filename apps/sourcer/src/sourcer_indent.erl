@@ -152,40 +152,43 @@ reindent_line(LineNr, Lines, Col, Prefs) ->
 
 reindent_line_0("\n"=L, _, _) -> {false, L};
 reindent_line_0("\r\n"=L, _, _) -> {false, L};
-reindent_line_0(Line, N, Prefs) ->
-    {Changed, L} =
-        case reindent_line_1(Line, N, 0) of
-            false -> {false, Line};
-            Indented -> {true, Indented}
-        end,
-    UseTabs = indent_by(use_tabs, Prefs),
+reindent_line_0(Line, Col, Prefs) ->
     TabLen  = indent_by(tab_len, Prefs),
-    {Tabbed, Res} = entab(L, UseTabs, TabLen),
-    {Changed orelse Tabbed, Res}.
+    UseTabs = indent_by(use_tabs, Prefs),
+    case strip_ws(Line, 0, 0) of
+        {_, Col, 0} when Col =:= Col ->
+            {false, Line};
+        {Str, _, _} when Col =:= 0 ->
+            {true, Str};
+        {Str, S, T} ->
+            case S+T*TabLen of
+                Col ->
+                    %% Need to update forms with new column
+                    %% since scanner counts \t as 1 char
+                    {true, Line};
+                _ ->
+                    New = lists:duplicate(Col, $ ) ++ Str,
+                    %% ?D("~2w => ~2w ~s~n", [S+T*TabLen, Col, Str]),
+                    {true, entab(New, UseTabs, TabLen)}
+            end
+    end.
 
-reindent_line_1(" " ++ S, I, N) ->
-    reindent_line_1(S, I, N+1);
-reindent_line_1("\t" ++ S, I, N) ->
-    reindent_line_1(S, I, N+100);
-reindent_line_1(S, I, N) when is_integer(I), I>0 ->
-    case I =:= N of
-        true  -> false;
-        false -> lists:duplicate(I, $ ) ++ S
-    end;
-reindent_line_1(_S, 0, 0) ->
-    false;
-reindent_line_1(S, 0, _) ->
-    S.
+strip_ws([$\s|Str], S, T) ->
+    strip_ws(Str, S+1, T);
+strip_ws([$\t|Str], S, T) ->
+    strip_ws(Str, S, T+1);
+strip_ws(Str, S, T) ->
+    {Str, S, T}.
 
 entab(S, false, _Tablength) ->
-    {false, S};
+    S;
 entab(S, true, Tablength) when Tablength < 2->
-    {false, S};
+    S;
 entab(S, true, Tablength) ->
     {Spaces, Line} = string:take(S, "\s\t"),
     N = lists:foldl(fun($\s, N) -> N+1; ($\t, N) -> N+Tablength end, 0, Spaces),
-    {true, lists:append([lists:duplicate($\t, N div Tablength),
-                         lists:duplicate($\s, N rem Tablength), Line])}.
+    lists:append([lists:duplicate($\t, N div Tablength),
+                  lists:duplicate($\s, N rem Tablength), Line]).
 
 newlines(Str) ->
     newlines(Str, 0).
