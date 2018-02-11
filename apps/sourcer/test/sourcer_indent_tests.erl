@@ -4,7 +4,7 @@
 -export([sourcer/1]).
 -include_lib("eunit/include/eunit.hrl").
 
-indent_test_() ->
+all_test_() ->
     Dir = filename:dirname(code:which(?MODULE)) ++ "/" ++ ?MODULE_STRING ++ "_data",
     OrigFs = filelib:wildcard(Dir ++ "/*"),
     io:format("Dir: ~s~nFs: ~p~n", [Dir, OrigFs]),
@@ -25,6 +25,69 @@ indent_test_() ->
      [?_assertMatch({ok, _}, Result) || Result <- Res] ++
          [?_assertMatch({ok, _}, Result) || Result <- Res2]
     }.
+
+lines_test_() ->
+    Basic =
+"foo() ->
+    line1,
+  line2,
+    case X of
+    clause1 ->
+            ok
+  end,
+  line7,
+    ok.",
+    Line2 = {2,"  line2,\n","    line2,\n"},
+    Line4 = {4,"    clause1 ->\n","        clause1 ->\n"},
+    Line6 = {6,"  end,\n",   "    end,\n"},
+    Line7 = {7,"  line7,\n", "    line7,\n"},
+    [ ?_assertMatch([], sourcer_indent:lines(0, 0, Basic))
+    , ?_assertMatch([Line2], sourcer_indent:lines(2, 2, Basic))
+    , ?_assertMatch([Line2], sourcer_indent:lines(0, 3, Basic))
+    , ?_assertMatch([Line4], sourcer_indent:lines(4, 5, Basic))
+    , ?_assertMatch([Line6,Line7], sourcer_indent:lines(6, 7, Basic))
+    ].
+
+line_test_() ->
+    Str = ["%% Comments\n",                      % line 0
+           "\n",
+           "%%\n",
+           "\n",
+           "line_test(Arg1,\n",                  % line 4
+           "          Arg2,\n",
+           "          \n",
+           "          Arg4)\n",                  % line 7
+           "  \n",
+           "  when Arg1 =:= Arg2,\n",
+           "       \n",
+           "       Arg4 > 10 ->\n",              % line 11
+           "    line1,\n",
+           "    case Arg1 of\n",
+           "        true ->\n",
+           "            case Arg2 of\n",         % line 15
+           "                true ->\n",
+           "                    ok\n",
+           "            \n",
+           "            end;\n",
+           "        \n",                         % line 20
+           "        false ->\n",
+           "            ok\n",
+           "    end,\n",
+           "    \n",
+           "    ok.\n"
+          ],
+    [?_test(do_test_line(N, Str)) || N <- lists:seq(0, length(Str)-1)].
+
+do_test_line(N, Str) ->
+    SrcLists = lists:sublist(Str, N),
+    Src = unicode:characters_to_list([SrcLists,"\n"]),
+    Indented = sourcer_indent:line(N, Src),
+    Next = lists:nth(N+1, Str),
+    %% io:format(user, "~.3w: ~s~n", [N, Next]),
+    ?assertEqual({N,string:span(Next, " ")}, {N,string:span(Indented, " ")}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Helpers
 
 unindent(Input) ->
     Output = Input ++ ".actual",
@@ -53,7 +116,7 @@ sourcer(File) ->
     io:format("* Indenting: ~s *~n",[File]),
     {ok, Bin} = file:read_file(File),
     Src = unicode:characters_to_list(Bin),
-    Indented = sourcer_indent:lines(Src),
+    Indented = sourcer_indent:all(Src),
     file:write_file(File, unicode:characters_to_binary(Indented)).
 
 

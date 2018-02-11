@@ -111,13 +111,11 @@ tokens_1({Cont, Orig}, Str, {_,_}=Start, Last) ->
     case erl_scan:tokens(Cont, Str, Start, [return_comments, text]) of
         {done, {ok, Tokens0, {Next,_} = EndLoc}, Rest} when Next < Last ->
             Tokens = convert_tokens(Tokens0),
-            {_, LastLoc, _, _} = lists:last(Tokens),
-            [{Tokens, Start, LastLoc} |
+            [{Tokens, Start, EndLoc} |
              tokens_1({[],""}, Rest, EndLoc, Last)];
-        {done, {ok, Tokens0, _EndLoc}, _Rest} ->
+        {done, {ok, Tokens0, EndLoc}, _Rest} ->
             Tokens = convert_tokens(Tokens0),
-            {_, LastLoc, _, _} = lists:last(Tokens),
-            [{Tokens, Start, LastLoc}];
+            [{Tokens, Start, EndLoc}];
         {done, {eof, _EndLoc}, _Rest} ->
             [];
         {done, {error, {ErrorLoc, _, _}=_Info, EndLoc}, Rest} ->

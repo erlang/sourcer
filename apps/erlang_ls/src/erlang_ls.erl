@@ -69,7 +69,7 @@ indent([File|Files], Verbose) ->
             {ok, BinSrc} ->
                 Enc = encoding(BinSrc),
                 Src = unicode:characters_to_list(BinSrc, Enc),
-                {ST,Indented} = timer:tc(fun() -> sourcer_indent:lines(Src) end),
+                {ST,Indented} = timer:tc(fun() -> sourcer_indent:all(Src) end),
                 ok = file:write_file(File, unicode:characters_to_binary(Indented, utf8, Enc)),
                 Verbose > 0 andalso io:format("Indent: ~.6wms ~s~n", [ST div 1000, File]),
                 indent(Files, Verbose);

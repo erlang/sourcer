@@ -1,9 +1,9 @@
 -module(sourcer_indent).
 
 -export([
-         %%         indent_line/4,
-         lines/1,
-         lines/2
+         line/2, line/3,
+         all/1, all/2,
+         lines/3, lines/4
         ]).
 
 %%-define(DEBUG, true).
@@ -49,22 +49,66 @@ default_indent_prefs() ->
 
      {indentW, 4},
      {use_tabs, false},
-     {tab_len, 8}
+     {tab_len, 8},
+     {suggest, false}      %% Indent empty lines and after eof when editing code
     ].
 
 %%
 %% API Functions
 
-lines(S) ->
-    lines(S, []).
+-spec all(InputSrc::string()) ->
+          OutSrc::string().
+all(S) ->
+    all(S, []).
 
-lines(S, Prefs0) ->
+-spec all(InputSrc::string(),
+            Opts::[{atom(), integer()|boolean()}]) ->
+          OutSrc::string().
+all(S, Prefs0) ->
     Tokens = sourcer_scan:tokens(S),
     Lines = array:from_list(sourcer_scan:split_lines(S)),
     Prefs = get_prefs(Prefs0),
     Stop = fun(Line, I) -> check_indent_lines(Line, I, Prefs) end,
-    Ls = do_indent_lines(0, Tokens, Lines, Stop, Prefs),
+    Ls = do_indent_lines(0, all, Tokens, Lines, Stop, Prefs),
     unicode:characters_to_list(array:to_list(Ls)).
+
+-spec lines(From::non_neg_integer(),
+            To::non_neg_integer(),
+            InputSrc::string()) ->
+          Changed::[{LineNr::integer(), OrigLine::string(), IndentedLine::string()}].
+lines(From, To, Src) ->
+    lines(From, To, Src, []).
+
+-spec lines(From::non_neg_integer(),
+            To::non_neg_integer(),
+            InputSrc::string(),
+            Opts::[{atom(), integer()|boolean()}]) ->
+          Changed::[{LineNr::integer(), OrigLine::string(), IndentedLine::string()}].
+lines(From, To, Src, Prefs0) ->
+    Tokens = sourcer_scan:tokens(Src, {0,1}, To+1),
+    Lines = array:from_list(sourcer_scan:split_lines(Src)),
+    Prefs = get_prefs(Prefs0),
+    Stop = fun(Line, I) -> check_indent_lines(Line, I, Prefs) end,
+    Ls = do_indent_lines(From, To, Tokens, Lines, Stop, Prefs),
+    pick_lines(From, To, Lines, Ls).
+
+-spec line(LineNr::non_neg_integer(),
+           InputSrc::string()) ->
+          Line :: string().
+line(Line, Src) ->
+    line(Line, Src, []).
+
+-spec line(LineNr::non_neg_integer(),
+           InputSrc::string(),
+           Opts::[{atom(), integer()|boolean()}]) ->
+          Line :: string().
+line(Line, Src, Prefs0) ->
+    Tokens = sourcer_scan:tokens(Src, {0,1}, Line+1),
+    Lines = array:from_list(sourcer_scan:split_lines(Src)),
+    Prefs = get_prefs([{suggest, true}|Prefs0]),
+    Stop = fun(This, I) -> check_indent_lines(This, I, Prefs) end,
+    Ls = do_indent_lines(Line, Line, Tokens, Lines, Stop, Prefs),
+    array:get(Line, Ls).
 
 %%
 %% Local Functions
@@ -81,7 +125,10 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
 get_prefs(Prefs) ->
     get_prefs(Prefs, default_indent_prefs(), []).
 
-do_indent_lines(LineNr0, Forms0, Lines0, Stop, Prefs) ->
+do_indent_lines(LineNr, To, _Forms, Lines, _Stop, _Prefs)
+  when LineNr > To ->
+    Lines;
+do_indent_lines(LineNr0, To, Forms0, Lines0, Stop, Prefs) ->
     case fetch_form(LineNr0, Forms0) of
         eof ->
             erase(?MODULE),
@@ -91,11 +138,18 @@ do_indent_lines(LineNr0, Forms0, Lines0, Stop, Prefs) ->
             Indent = indent(Form, LineNr0, Stop),
             {LineNr, Forms, Lines} =
                 do_indent_cont(Indent, LineNr0, Lines0, Form, Forms1, Prefs),
-            do_indent_lines(LineNr, Forms, Lines, Stop, Prefs)
+            do_indent_lines(LineNr, To, Forms, Lines, Stop, Prefs)
     end.
 
-do_indent_cont({eof, LineNr, _Col}, _Nr, Lines0, _Form, Forms, _Prefs) ->
-    {LineNr, Forms, Lines0};
+do_indent_cont({eof, LineNr, ToCol}, Nr, Lines0, _Form, Forms,
+               #{suggest:=Suggest} = Prefs) ->
+    case Suggest of
+        true when LineNr =:= Nr ->
+            {_Changed, Lines} = reindent_line(LineNr, Lines0, ToCol, Prefs),
+            {LineNr, Forms, Lines};
+        _ ->
+            {LineNr, Forms, Lines0}
+    end;
 do_indent_cont({IndLine, ToCol, Skip}, LineNr0, Lines0, Form0, Forms, Prefs) ->
     %% IndLine is less then LineNr0 if scan_error
     LineNr = max(IndLine, LineNr0),
@@ -150,8 +204,8 @@ reindent_line(LineNr, Lines, Col, Prefs) ->
         {false, _} -> {false, Lines}
     end.
 
-reindent_line_0("\n"=L, _, _) -> {false, L};
-reindent_line_0("\r\n"=L, _, _) -> {false, L};
+reindent_line_0("\n"=L, _, #{suggest:=false}) -> {false, L};
+reindent_line_0("\r\n"=L, _, #{suggest:=false}) -> {false, L};
 reindent_line_0(Line, Col, Prefs) ->
     TabLen  = indent_by(tab_len, Prefs),
     UseTabs = indent_by(use_tabs, Prefs),
@@ -189,6 +243,17 @@ entab(S, true, Tablength) ->
     N = lists:foldl(fun($\s, N) -> N+1; ($\t, N) -> N+Tablength end, 0, Spaces),
     lists:append([lists:duplicate($\t, N div Tablength),
                   lists:duplicate($\s, N rem Tablength), Line]).
+
+pick_lines(From, To, Orig, Indented) when From =< To ->
+    Input  = array:get(From, Orig),
+    Indent = array:get(From, Indented),
+    case Input =:= Indent of
+        true -> pick_lines(From+1, To, Orig, Indented);
+        false -> [{From, Input, Indent}|
+                  pick_lines(From+1, To, Orig, Indented)]
+    end;
+pick_lines(_From, _To, _Orig, _Indented) ->
+    [].
 
 newlines(Str) ->
     newlines(Str, 0).
@@ -311,8 +376,6 @@ i_form_list([?line(Line)|_] = R0, I0) ->
 i_form_list([], I) ->
     i_check([], I).
 
-i_expr([], I, _A) ->
-    {[], I};
 i_expr(R0, I0, A) ->
     R1 = i_comments(R0, I0),
     R2 = i_1_expr(R1, I0),
@@ -1113,6 +1176,8 @@ i_clause(R0, I0, Tag) ->
 	    R5 = i_kind('->', R4, I3),
 	    I5 = push(Tag, I0),
 	    i_expr_list(R5, I5);
+        eof ->
+            i_check([], I3);
 	_ ->
 	    R4
     end.
