@@ -180,3 +180,8 @@ funs(4) ->
                     end, [], Z),
     A = <<X/binary, 0:8>>,
     A.
+
+function() ->
+    call_another
+      (X,
+       Y).

@@ -141,7 +141,8 @@ indent_receive(2) ->
         Z ->
             X = 43 div 4,
             foo(X)
-    after infinity ->
+    after
+        infinity ->
             foo(X),
             asd(X),
             5*43
@@ -155,13 +156,3 @@ indent_receive() ->
                        5*43
                end,
     ok.
-
-%% Not icr but binary operation outside of predicate lists
-display_date({{Y,Mo,D},{H,Mi,S}}) ->
-    erlang:display_string(
-      integer_to_list(Y) ++ "-" ++
-          two_digits(Mo) ++ "-" ++
-          two_digits(D)  ++ " " ++
-          two_digits(H)  ++ ":" ++
-          two_digits(Mi) ++ ":" ++
-          two_digits(S)  ++ " ").

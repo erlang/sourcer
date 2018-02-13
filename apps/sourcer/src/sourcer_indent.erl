@@ -314,6 +314,11 @@ indent_by(none, _) -> 0;
 indent_by(Key, Prefs) ->
     maps:get(Key, Prefs, 0).
 
+
+get_indent_of(#i{anchor=[{paren, _}, {Type, _}|_]}=I, Prefs)
+  when Type =:= parameters;
+       Type =:= record_def ->
+    get_indent_of(pop(I#i{current=none}), Prefs);
 get_indent_of(#i{anchor=[{What, ?col(CA)}=_A|_],
                  current={C, ?col(Exp)}}, Prefs)
   when is_atom(What), is_atom(C) ->
@@ -365,8 +370,8 @@ i_form_list([?line(Line)|_] = R0, I0) ->
     try i_form(R0, I0) of
         {R0, _}  -> %% We are looping something is wrong
             i_check({parse_error, Line}, I0);
-        {R, I} ->
-            i_form_list(R, I)
+        {R, #i{skip=Skip}} ->
+            i_form_list(R, I0#i{skip=Skip})
     catch error:_E ->
             ?D("~p:~p: @~w: Error:~n ~P~n  ~P~n",
                [?MODULE, ?LINE, Line, _E, 20, erlang:get_stacktrace(), 20]),
@@ -421,7 +426,7 @@ i_expr_rest(R0, I, A) ->
             {R2, _A} = i_expr(R1, push(after_op, I), A),
             {R2, I};
         '=' -> % match/assignment
-            R1 = i_binary_op(R0, I),
+            R1 = i_binary_op(R0, push(before_arrow, I)),
             I1 = push(after_op, I),
             {R2, _A} = i_expr(R1, I1, top(I1)),
             {R2, I};
@@ -443,7 +448,7 @@ i_expr_rest(R0, I, A) ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
                     {Anchor, _} = A,
-                    Align = [after_op, 'when', 'after_when', clause, paren],
+                    Align = [after_op, 'when', 'after_when', clause],
                     I2 = case lists:member(Anchor, Align) of
                              true ->
                                  push(none, keep_one(A, I));
@@ -459,11 +464,11 @@ i_expr_rest(R0, I, A) ->
     end.
 
 i_par_list(R0, I0) ->
-    R1 = i_kind('(', R0, I0),
+    R1 = i_kind('(', R0, push(before_arrow,I0)),
     I1 = case top(I0) of
-             {_, ?k(F)=A} when F =:= 'atom'; F =:= 'var' ->
-                 I10 = push(paren, R0, pop(I0)),
-                 push(parameters, A, I10);
+             {_, ?k(F)} when F =:= 'atom'; F =:= 'var'; F=:= 'macro' ->
+                 I10 = push(parameters, I0),
+                 push(paren, R0, I10);
              _ ->
                  push(paren, R0, I0)
          end,
@@ -505,16 +510,11 @@ i_expr_list(R, I) ->
 
 i_expr_list(R0, I0, A0) ->
     R1 = i_comments(R0, I0),
-    {R2, I11} = i_expr(R1, I0, A0),
+    {R2, I11} = i_expr(R1, I0, top(I0)),
     I1 = keep_one(A0, I11),
     case i_sniff(R2) of
         Delim when Delim =:= ','; Delim =:= '|' ->
-            I10 = pop_until(A0, I0),
-            {_, Start} = case A0 of
-                             {parameters,_} -> top(pop(I10));
-                             {record_def,_} -> top(pop(I10));
-                             _ -> top(I10)
-                         end,
+            {_, Start} = top(pop_until(A0, I0)),
             R3 = i_kind(Delim, R2, i_with({delimiter, Start}, I1)),
             i_expr_list(R3, I1, A0);
         '||' ->
@@ -674,9 +674,9 @@ i_fun([?k('fun')=T | R0] = R00, I) ->
     I1 = push('fun', T, I),
     case i_sniff(R0) of
         '(' ->
-	    case i_sniff(i_one(R0, I)) of
+	    case i_sniff(i_one(R0, push(none,I1))) of
 		'(' ->
-		    {R1, _} = i_type_fun(R00, I),
+		    {R1, _} = i_type_fun(R00, I1),
 		    R1;
 		_ ->
 		    R1 = i_fun_clause_list(R0, I1, top(I1)),
@@ -704,7 +704,7 @@ i_fun([?k('fun')=T | R0] = R00, I) ->
 
 i_macro(R0, I) ->
     R = i_one(R0, I),
-    i_macro_rest(R, I).
+    i_macro_rest(R, push(none, R0, I)).
 
 i_macro_rest(R0, I) ->
     case i_sniff(R0) of
@@ -759,7 +759,7 @@ i_receive(R0, I1) ->
          end,
     R4 = case i_sniff(R2) of
              'after' ->
-                 I3 = push('after', R2, I1),
+                 I3 = push(clause, R2, I1),
                  R3 = i_kind('after', R2, push(none, I2)),
                  i_after_clause(R3, I3);
              _ ->
@@ -861,8 +861,8 @@ i_record(R00, I) ->
             {i_end_paren_or_expr_list(R3, I1), I};
         '{' ->
             R3 = i_kind('{', R2, I),
-            I10 = push(paren, R2, I),
-            I1 = push(record_def, A0, I10),
+            I10 = push(record_def, A0, I),
+            I1 = push(paren, R2, I10),
             {i_end_paren_or_expr_list(R3, I1), I};
         '[' ->
             i_expr(R2, I, top(I));
@@ -940,14 +940,18 @@ i_form(R0, I) ->
         '-' ->
             i_declaration(R1, I);
         _ ->
-            R3 = i_clause(R1, push(none, R1, I), after_arrow),
-            i_dot_or_semi(R3, I)
+            I1 = push(none, R1, I),
+            {R3, I2} = i_clause(R1, I1, top(I1), after_arrow),
+            {R4, I3} = i_dot_or_semi(R3, I2),
+            {R4, I3}
     end.
 
 i_dot_or_semi(R, I) ->
     case i_sniff(R) of
         DS when DS==dot; DS==';' ->
             {i_kind(DS, R, I), I#i{skip=hd(R)}};
+        eof ->
+            i_check([], I);
         _ ->
             {R, I}
     end.
@@ -974,8 +978,8 @@ i_declaration(R0, I) ->
     end.
 
 i_typedef(R0, I0) ->
-    {R1, _I1} = i_expr(R0, I0, top(I0)),
-    i_dot(R1, I0).
+    {R1, I1} = i_expr(R0, I0, top(I0)),
+    i_dot(R1, I1).
 
 i_type(R0, I0, A0) ->
     {R1, I1} = case i_sniff(R0) of
@@ -1017,9 +1021,9 @@ i_spec_expr(R0, I0, A0) ->
     {R1, I1} = i_type(R0, I0, A0),
     case i_sniff(R1) of
         'when' ->
-            R11 = i_kind('when', R1, I1),
-            I2 = pop_until(A0, I0),
-            {R2, _} = i_spec_expr(R11, push(none, I2), top(I2)),
+            I2 = push(none, pop_until(A0, I0)),
+            R11 = i_kind('when', R1, I2),
+            {R2, _} = i_spec_expr(R11, I2, top(I2)),
             {R2, I1};
         ',' ->
             R11 = i_kind(',', R1, push(delimiter_spec, I1)),
@@ -1030,29 +1034,33 @@ i_spec_expr(R0, I0, A0) ->
     end.
 
 i_spec_aux(R0, I0) ->
-    {R1,I1} =
+    {R2,I2} =
         case i_sniff(R0) of
             '(' ->
-                {R0, pop(I0)};
+                R1 = i_kind('(', R0, push(none, I0)),
+                {R1, I0};
             _ ->
                 R10 = i_atom_or_macro(R0, I0),
-                case i_sniff(R10) of
-                    ':' ->
-                        R11 = i_kind(':', R10, I0),
-                        {i_atom_or_macro(R11, I0), push(none, R0, I0)};
-                    _ ->
-                        {R10, push(none, R0, I0)}
-                end
+                R12 = case i_sniff(R10) of
+                          ':' ->
+                              R11 = i_kind(':', R10, I0),
+                              i_atom_or_macro(R11, I0);
+                          _ ->
+                              R10
+                      end,
+                R1 = i_kind('(', R12, I0),
+                I10 = push(parameters, R0, I0),
+                I1 = push(paren, R12, I10),
+                {R1, I1}
         end,
-    R2 = i_kind('(', R1, I0),
-    I2 = push(none, R1, I1),
     {R3, _I2} = i_spec_expr(R2, I2, top(I2)),
-    R4 = i_kind(')', R3, I2),
+    R4 = i_kind(')', R3, push(none, I2)),
     case i_sniff(R4) of
         '->' ->
-            R5 = i_kind('->', R4, I1),
-            I3 = push(after_arrow, R0, I1),
-            {R6, _} = i_spec_expr(R5, I3, top(I1)),
+            I3 = pop(I2),
+            R5 = i_kind('->', R4, I3),
+            I4 = push(after_arrow, I3),
+            {R6, _} = i_spec_expr(R5, I4, top(I4)),
             {R6, I2};
         _ ->
             {R4, I2}
@@ -1065,25 +1073,26 @@ i_spec_list(R0, I0, A0) ->
             R2 = i_kind(';', R1, push(delimiter_spec, I1)),
             i_spec_list(R2, I1, A0);
         _ ->
-            R1
+            {R1,pop(I1)}
     end.
 
 i_spec(R0, I) ->
-    R = case i_sniff(R0) of
-            '(' -> %% old style as in -spec(funcname(a1,a2) -> type()).
-                R1 = i_kind('(', R0, I),
-                R2 = i_spec_list(R1, I, top(I)),
-                R3 = i_kind(')', R2, I),
-                R3;
-            _ ->
-		i_spec_list(R0, I, top(I))
-	end,
-    i_dot(R, I).
+    {R,I2} = case i_sniff(R0) of
+                 '(' -> %% old style as in -spec(funcname(a1,a2) -> type()).
+                     R1 = i_kind('(', R0, I),
+                     I1 = push(spec, R0, I),
+                     {R2,I10} = i_spec_list(R1, I1, top(I1)),
+                     R3 = i_kind(')', R2, I1),
+                     {R3, I10};
+                 _ ->
+                     i_spec_list(R0, I, top(I))
+             end,
+    i_dot(R, push(none, I2)).
 
 i_macro_def(R0, I0) ->
     R1 = i_kind('(', R0, I0),
-    I10 = push('paren', R0, I0),
-    I1 = push(parameters, element(2,top(I0)), I10),
+    I10 = push(parameters, I0),
+    I1  = push('paren', R0, I10),
     {R2, I2} = i_expr(R1, I1, top(I1)),
     R3 = i_kind(',', R2, I1),
     {R4, I3} = i_macro_exp(R3, I2, top(I1)),
@@ -1155,8 +1164,9 @@ i_after_clause(R0, I0) ->
     R2 = i_kind('->', R1, I0),
     i_expr_list(R2, push(icr, I0)).
 
-i_clause(R0, I0, Tag) ->
-    {R1, I10} = i_expr(R0, I0, top(I0)),
+i_clause(R0, I, A0, Tag) ->
+    I0 = pop_until(A0, I),
+    {R1, I10} = i_expr(R0, I, top(I)),
     I1 = push(before_arrow, I10),
     {R4,I3} = case i_sniff(R1) of
                   'when' ->
@@ -1175,21 +1185,23 @@ i_clause(R0, I0, Tag) ->
 	'->' ->
 	    R5 = i_kind('->', R4, I3),
 	    I5 = push(Tag, I0),
-	    i_expr_list(R5, I5);
-        eof ->
-            i_check([], I3);
+	    {i_expr_list(R5, I5), I10};
 	_ ->
-	    R4
+	    {R4, I3}
     end.
 
-i_clause_list(R, I, Tag) ->
-    R0 = i_clause(R, I, Tag),
-    case i_sniff(R0) of
+i_clause_list(R0, I, Tag) ->
+    i_clause_list(R0, I, top(I), Tag).
+
+i_clause_list(R0, I0, A0, Tag) ->
+    {R1, I1} = i_clause(R0, I0, A0, Tag),
+    case i_sniff(R1) of
         ';' ->
-            R1 = i_kind(';', R0, push(delimiter_clause, I)),
-            i_clause_list(R1, I, Tag);
+            I = push(none, keep_one(A0, I1)),
+            R2 = i_kind(';', R1, push(delimiter_clause, pop_until(A0, I))),
+            i_clause_list(R2, I, A0, Tag);
         _ ->
-            R0
+            R1
     end.
 
 i_if_clause(R0, I0, A0) ->

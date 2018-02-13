@@ -78,9 +78,12 @@
                               is_subtype(t24(), t14()),
                               is_subtype(t24(), t4()).
 
--spec over(I :: integer()) -> R1 :: foo:typen();
-          (A :: atom()) -> R2 :: foo:atomen();
-          (T :: tuple()) -> R3 :: bar:typen().
+-spec over_spec(I :: integer()) ->
+          R1 :: foo:typen();
+               (A :: atom()) ->
+          R2 :: foo:atomen();
+               (T :: tuple()) ->
+          R3 :: bar:typen().
 
 -spec mod:t2() -> any().
 
@@ -94,7 +97,8 @@
                   #state{}) ->
           {'noreply', #state{}}.
 
--spec all(fun((T) -> boolean()), List :: [T]) ->
+-spec all(
+        fun((T) -> boolean()), List :: [T]) ->
           boolean() when is_subtype(T, term()). % (*) % Emacs differ
 
 -spec get_closest_pid(term()) ->
@@ -140,12 +144,25 @@
            | nonempty_maybe_improper_list(fun(), list())
            | fun().
 
--spec logfile(Request :: {open, Filename}) -> ok | {error, OpenReason} when
+-spec logfile(Request :: {open, Filename}) ->
+          ok | {error, OpenReason} when
       Filename ::file:name(),
       OpenReason :: allready_have_logfile | open_error();
-             (Request :: close) -> ok | {error, CloseReason} when
+             (Request :: close) ->
+          ok | {error, CloseReason}
+      when
       CloseReason :: module_not_found
-           ; (Request :: filename) -> Filename | {error, FilenameReason} when
+           ; (Request :: filename) ->
+          Filename | {error, FilenameReason} when
       Filename :: file:name(),
       FilenameReason :: no_log_file.
 
+%% Old style
+
+-spec(exprs(Expressions, Bindings, LocalFunctionHandler) ->
+          {value, Value, NewBindings} when
+      Expressions :: expressions(),
+      Bindings :: binding_struct(),
+      LocalFunctionHandler :: local_function_handler(),
+      Value :: value(),
+      NewBindings :: binding_struct()).
