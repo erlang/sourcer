@@ -54,6 +54,8 @@ a_function_with_a_very_very_long_name() ->
              field2=1
             },
     A00.
+directly_after() ->
+    ok.
 
 when1(W1, W2)
   when is_number(W1),
@@ -74,6 +76,12 @@ when3(W1,W2,W3) when
 when4(W1,W2,W3)
   when
       W1 > W2,
+      W2 > W3 ->
+    ok.
+
+when5(W1,W2,W3)
+  when
+      W1 > W2 orelse
       W2 > W3 ->
     ok.
 
@@ -172,3 +180,8 @@ funs(4) ->
                     end, [], Z),
     A = <<X/binary, 0:8>>,
     A.
+
+function() ->
+    call_another
+      (X,
+       Y).

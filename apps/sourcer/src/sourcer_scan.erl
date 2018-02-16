@@ -3,7 +3,7 @@
 -define(DEBUG, true).
 -include("debug.hrl").
 
--export([line_info/1,
+-export([line_info/1, split_lines/1,
          string/1, string/2, string/3,
          tokens/1, tokens/3,
          filter_ws_tokens/1,
@@ -54,6 +54,18 @@ get_indent(String) ->
          (C >= $\000 andalso C =< $\s orelse C >= $\200 andalso C =< $\240)).
 is_white_space(C) -> ?WHITE_SPACE(C).
 
+-spec split_lines(string()) -> [string()].
+split_lines(Str) ->
+    split_lines(Str, []).
+
+split_lines("\n" ++ Rest, Line) ->
+    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
+split_lines([C|Rest], Line) ->
+    split_lines(Rest, [C|Line]);
+split_lines([], Line) ->
+    [lists:reverse(Line)].
+
+
 -spec string(string()) -> {ok, [token()], any()} | {error, any()}.
 string(String) ->
     string(String, {0, 1}).
@@ -89,30 +101,53 @@ string2(String, {L, C}, Opts) ->
     end.
 
 tokens(Str) ->
-    tokens_1([], Str, {0, 1}, all).
+    tokens_1({[],""}, Str, {0, 1}, all).
 
 tokens(Str, Loc, Last) ->
-    tokens_1([], Str, Loc, Last).
+    tokens_1({[],""}, Str, Loc, Last).
 
 %% Scans Str after tokens until line
-tokens_1(Cont, Str, {_,_}=Start, Last) ->
+tokens_1({Cont, Orig}, Str, {_,_}=Start, Last) ->
     case erl_scan:tokens(Cont, Str, Start, [return_comments, text]) of
         {done, {ok, Tokens0, {Next,_} = EndLoc}, Rest} when Next < Last ->
             Tokens = convert_tokens(Tokens0),
-            {_, LastLoc, _, _} = lists:last(Tokens),
-            [{Tokens, Start, LastLoc} | tokens_1([], Rest, EndLoc, Last)];
-        {done, {ok, Tokens0, _EndLoc}, _Rest} ->
+            [{Tokens, Start, EndLoc} |
+             tokens_1({[],""}, Rest, EndLoc, Last)];
+        {done, {ok, Tokens0, EndLoc}, _Rest} ->
             Tokens = convert_tokens(Tokens0),
-            {_, LastLoc, _, _} = lists:last(Tokens),
-            [{Tokens, Start, LastLoc}];
+            [{Tokens, Start, EndLoc}];
         {done, {eof, _EndLoc}, _Rest} ->
             [];
-        {done, {error, Info, EndLoc}, Rest} ->
-            %% FIXME (investigate scanner errors)
-            io:format("Scanner Error: ~p~n",[Info]),
-            tokens_1([], Rest, EndLoc, Last);
+        {done, {error, {ErrorLoc, _, _}=_Info, EndLoc}, Rest} ->
+            Until = case Orig of
+                        "" -> until_error(Str, Start, ErrorLoc);
+                        _  -> until_error(Orig, Start, ErrorLoc)
+                    end,
+            [{BefTokens,SLoc,_}] = tokens_1({[],""}, Until, Start, Last),
+            ErrToken = {scan_error, ErrorLoc, "", undefined},
+            case tokens_1({[],""}, Rest, EndLoc, Last) of
+                [] ->
+                    [{BefTokens++[ErrToken], SLoc, EndLoc}];
+                [{AfterTokens,_, ELoc}|RestForms] ->
+                    [{BefTokens++[ErrToken|AfterTokens], SLoc, ELoc}|RestForms]
+            end;
         {more, More} ->
-            tokens_1(More, eof, Start, Last)
+            tokens_1({More, Str}, eof, Start, Last)
+    end.
+
+until_error(Str, {SL,SC}, {EL,EC}) ->
+    until_error(Str, SL, SC, EL, EC).
+
+until_error([Char|Str], SL, SC, EL, EC) ->
+    if SL < EL ->
+            case Char =:= $\n of
+                true -> [$\n|until_error(Str, SL+1, 1, EL, EC)];
+                false -> [Char|until_error(Str,SL,SC,EL,EC)]
+            end;
+       SC < EC ->
+            [Char|until_error(Str, SL, SC+1, EL, EC)];
+       true ->
+            []
     end.
 
 filter_tokens_by_kinds(Tokens, Kinds) ->

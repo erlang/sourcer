@@ -141,17 +141,18 @@ indent_receive(2) ->
         Z ->
             X = 43 div 4,
             foo(X)
-    after infinity ->
+    after
+        infinity ->
             foo(X),
             asd(X),
             5*43
     end,
     ok;
 indent_receive() ->
-    receive
-    after 10 ->
-            foo(X),
-            asd(X),
-            5*43
-    end,
+    MyResult = receive
+               after 10 ->
+                       foo(X),
+                       asd(X),
+                       5*43
+               end,
     ok.

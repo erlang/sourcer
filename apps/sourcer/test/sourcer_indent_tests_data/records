@@ -37,4 +37,17 @@
 record_usage(A) ->
     %% Test parser
     A = bnot (id())#record_usage.r5a,
-    {ok, A}.
+    Bool = Parms#?HASH_PARMS.bchunk_format_version =:=
+           ?BCHUNK_FORMAT_VERSION,
+    {ok, A, Bool}.
+
+record_usage(Argument) ->
+    B0 = Argument#record_usage
+           {field1 =
+                foo},
+    B0 = Argument#record_usage{
+           field1 =
+               foo},
+
+    {ok, B}.
+

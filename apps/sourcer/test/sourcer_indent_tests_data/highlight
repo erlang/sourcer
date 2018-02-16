@@ -73,6 +73,6 @@ highlighting(X)			  % Function definitions should be highlighted
     234234,
     234.43,
 
-    [list, are, not, higlighted],
+    [list, are, 'not', higlighted],
     {nor, is, tuple},
     ok.

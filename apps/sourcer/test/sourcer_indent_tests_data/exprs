@@ -1,0 +1,38 @@
+%% -*- Mode: erlang; indent-tabs-mode: nil -*-
+%% Copyright Ericsson AB 2017. All Rights Reserved.
+
+%%% indentation of exprs
+
+%%% Not everything in these test are set in stone
+%%% better indentation rules can be added but by having
+%%% these tests we can see what changes in new implementations
+%%% and notice when doing unintentional changes
+
+
+
+f1() ->
+    Var = [ a,
+            b
+          | c],
+    [ a1,
+      some_func(b)
+    | Var].
+
+bin_op({{Y,Mo,D},{H,Mi,S}}) ->
+    erlang:display_string(
+      integer_to_list(Y) ++ "-" ++
+          two_digits(Mo) ++ "-" ++
+          two_digits(D)  ++ " " ++
+          two_digits(H)  ++ ":" ++
+          two_digits(Mi) ++ ":" ++
+          two_digits(S)  ++ " ").
+
+
+double_match() ->
+    LongExpr = A =
+        foo,
+    VarA =:= VarB orelse
+        VarC =:= VarD orelse
+        VarE =:= VarD.
+
+

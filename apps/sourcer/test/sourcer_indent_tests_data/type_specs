@@ -49,14 +49,16 @@
                                         <<_:34>>|<<_:34>>|<<_:34>>].
 
 -type t18() ::
-        fun(() -> t17() | t16()).
+        fun(() ->
+            t17() | t16()
+           ).
 -type t19() ::
         fun((t18()) -> t16()) |
         fun((nonempty_maybe_improper_list('integer', any())|
              1|2|3|a|b|<<_:3,_:_*14>>|integer())
             ->
-                nonempty_maybe_improper_list('integer', any())| % Emacs differ
-                1|2|3|a|b|<<_:3,_:_*14>>|integer()). % Emacs differ
+            nonempty_maybe_improper_list('integer', any())| % Emacs differ
+            1|2|3|a|b|<<_:3,_:_*14>>|integer()). % Emacs differ
 -type t20() :: [t19(), ...].
 -type t25() :: #rec3{f123 :: [t24() |
                               1|2|3|4|a|b|c|d|
@@ -76,9 +78,12 @@
                               is_subtype(t24(), t14()),
                               is_subtype(t24(), t4()).
 
--spec over(I :: integer()) -> R1 :: foo:typen();
-          (A :: atom()) -> R2 :: foo:atomen();
-          (T :: tuple()) -> R3 :: bar:typen().
+-spec over_spec(I :: integer()) ->
+          R1 :: foo:typen();
+               (A :: atom()) ->
+          R2 :: foo:atomen();
+               (T :: tuple()) ->
+          R3 :: bar:typen().
 
 -spec mod:t2() -> any().
 
@@ -92,13 +97,14 @@
                   #state{}) ->
           {'noreply', #state{}}.
 
--spec all(fun((T) -> boolean()), List :: [T]) ->
+-spec all(
+        fun((T) -> boolean()), List :: [T]) ->
           boolean() when is_subtype(T, term()). % (*) % Emacs differ
 
 -spec get_closest_pid(term()) ->
           Return :: pid()
                   | {'error', {'no_process', term()}}
-                  | {'no_such_group', term()}}.
+                  | {'no_such_group', term()}.
 
 -spec add( X :: integer()
          , Y :: integer()
@@ -137,3 +143,26 @@
 -type f() :: {module(), atom(), list()}
            | nonempty_maybe_improper_list(fun(), list())
            | fun().
+
+-spec logfile(Request :: {open, Filename}) ->
+          ok | {error, OpenReason} when
+      Filename ::file:name(),
+      OpenReason :: allready_have_logfile | open_error();
+             (Request :: close) ->
+          ok | {error, CloseReason}
+      when
+      CloseReason :: module_not_found
+           ; (Request :: filename) ->
+          Filename | {error, FilenameReason} when
+      Filename :: file:name(),
+      FilenameReason :: no_log_file.
+
+%% Old style
+
+-spec(exprs(Expressions, Bindings, LocalFunctionHandler) ->
+          {value, Value, NewBindings} when
+      Expressions :: expressions(),
+      Bindings :: binding_struct(),
+      LocalFunctionHandler :: local_function_handler(),
+      Value :: value(),
+      NewBindings :: binding_struct()).
