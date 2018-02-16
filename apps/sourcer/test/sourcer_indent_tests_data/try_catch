@@ -94,11 +94,11 @@ indent_catch() ->
     B = catch oskar(X),
 
     A = catch (baz +
-                   bax),
+               bax),
     catch foo(),
 
     C = catch B +
-        float(43.1),
+              float(43.1),
 
     case catch foo(X) of
         A ->
@@ -162,4 +162,11 @@ catcher(N) ->
     catch throw:X -> {N, caught, thrown, X};
           exit:X -> {N, caught, exited, X};
           error:X -> {N, caught, error, X}
+    end.
+
+unary_ops() ->
+    case catch
+           func() of
+        asd ->
+            ok
     end.

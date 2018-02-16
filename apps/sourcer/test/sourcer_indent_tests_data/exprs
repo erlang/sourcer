@@ -28,3 +28,11 @@ bin_op({{Y,Mo,D},{H,Mi,S}}) ->
           two_digits(S)  ++ " ").
 
 
+double_match() ->
+    LongExpr = A =
+        foo,
+    VarA =:= VarB orelse
+        VarC =:= VarD orelse
+        VarE =:= VarD.
+
+

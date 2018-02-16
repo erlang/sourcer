@@ -8,8 +8,8 @@
 
 %%-define(DEBUG, true).
 -ifdef(DEBUG).
--define(D(T), io:format("~p\n", [{??T, ?MODULE, ?LINE, T}])).
--define(D(F,A), io:format("~w:~w: " ++ F, [?MODULE, ?LINE|A])).
+-define(D(T), io:format(user, "~p\n", [{??T, ?MODULE, ?LINE, T}])).
+-define(D(F,A), io:format(user, "~w:~w: " ++ F, [?MODULE, ?LINE|A])).
 -else.
 -define(D(T), ok).
 -define(D(F,A), ok).
@@ -43,6 +43,7 @@ default_indent_prefs() ->
      {end_paren2, -2},     %% go left 2 when '>>'
      {end_block, 0},       %% end aligns with icr start
      {record_def, 2},      %% indentW div 2
+     {unary_op, 2},        %% indentW div 2
      {comment_3, 0},       %% start of the line
      {comment_2, 0},       %% start of the expression
      {comment_1, 48},      %% column 48
@@ -415,7 +416,7 @@ i_expr_rest(R0, I, A) ->
         eof ->
             {R0, I};
         '#' -> % record something
-            {R1, _} = i_record(R0, I),
+            {R1, _} = i_record(R0, push(after_op,I)),
             i_expr_rest(R1, I, A);
         ':' -> % external function call
             R1 = i_kind(':', R0, I),
@@ -427,8 +428,14 @@ i_expr_rest(R0, I, A) ->
             {R2, I};
         '=' -> % match/assignment
             R1 = i_binary_op(R0, push(before_arrow, I)),
-            I1 = push(after_op, I),
-            {R2, _A} = i_expr(R1, I1, top(I1)),
+            {R2, _A} = case A of
+                           {after_op, _} ->
+                               I1 = pop_until(A, I),
+                               i_expr(R1, I1, top(I1));
+                           _ ->
+                               I1 = push(after_op, I),
+                               i_expr(R1, I1, top(I1))
+                       end,
             {R2, I};
         '=>' -> % maps
             R1 = i_binary_op(R0, I),
@@ -441,15 +448,13 @@ i_expr_rest(R0, I, A) ->
         '|' -> %% List
             {R0, I};
         '::' -> %% type
-            R1 = i_kind('::', R0, I),
+            R1 = i_kind('::', R0, push(delimiter_spec, I)),
             {R2, _A} = i_type(R1, push(before_arrow, I), top(I)),
             {R2, I};
         _ ->
             case is_binary_op(i_sniff(R0)) of
                 true ->
-                    {Anchor, _} = A,
-                    Align = [after_op, 'when', 'after_when', clause],
-                    I2 = case lists:member(Anchor, Align) of
+                    I2 = case align_binary_op(pop_until(A, I)) of
                              true ->
                                  push(none, keep_one(A, I));
                              false ->
@@ -461,6 +466,18 @@ i_expr_rest(R0, I, A) ->
                 false ->
                     {R0, I}
             end
+    end.
+
+align_binary_op(I) ->
+    case top(I) of
+        {paren, _} ->
+            case top(pop(I)) of
+                {parameters,_} -> false;
+                _ -> true
+            end;
+        {Anchor,_} ->
+            Align = [after_op, unary_op, 'when', 'after_when', clause],
+            lists:member(Anchor, Align)
     end.
 
 i_par_list(R0, I0) ->
@@ -664,8 +681,10 @@ i_1_expr(R0, I) ->
     R1 = i_comments(R0, I),
     case is_unary_op(R1) of
         true ->
-            R2 = i_one(R1, I),
-            i_1_expr(R2, push(after_op, R2, I));
+            R2 = i_one(R1, push(unary_op, I)),
+            I1 = push(unary_op, R1, I),
+            {R3,_} = i_expr(R2, I1, top(I1)),
+            R3;
         false ->
             R1
     end.
@@ -860,8 +879,8 @@ i_record(R00, I) ->
             I1 = push(paren, R2, I),
             {i_end_paren_or_expr_list(R3, I1), I};
         '{' ->
-            R3 = i_kind('{', R2, I),
             I10 = push(record_def, A0, I),
+            R3 = i_kind('{', R2, I10),
             I1 = push(paren, R2, I10),
             {i_end_paren_or_expr_list(R3, I1), I};
         '[' ->
@@ -914,8 +933,7 @@ i_atom_or_macro(R0, I) ->
         atom ->
             i_kind(atom, R0, I);
         macro ->
-            {R, _} = i_expr(R0, I, top(I)),
-            R
+            i_macro(R0, I)
     end.
 
 i_kind(Kind, R0, I) ->
@@ -993,7 +1011,7 @@ i_type(R0, I0, A0) ->
             i_type(R2, I, A0);
         '::' ->
             I = keep_one(A0, I1),
-            R2 = i_kind('|', R1, push(delimiter_spec, I)),
+            R2 = i_kind('::', R1, push(delimiter_spec, I)),
             i_type(R2, I1, A0);
         _ ->
             {R1, I1}
@@ -1095,7 +1113,7 @@ i_macro_def(R0, I0) ->
     I1  = push('paren', R0, I10),
     {R2, I2} = i_expr(R1, I1, top(I1)),
     R3 = i_kind(',', R2, I1),
-    {R4, I3} = i_macro_exp(R3, I2, top(I1)),
+    {R4, I3} = i_macro_exp(R3, I2, top(I2)),
     R5 = i_end_paren(R4, I3, top(I1)),
     i_dot(R5, I0).
 
