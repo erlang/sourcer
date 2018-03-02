@@ -26,11 +26,11 @@ main(Args) ->
 
 cli_options() ->
     [
-     {dump,    $d,        "dump",     string,      "Dump sourcer db for file"},
-     {port,    $p,        "port",    integer,               "LSP server port"},
-     {verbose, $v,        "verbose", integer,               "Verbosity level"},
-     {indent,  $i,        "indent",   string,      "Indent file(s) and exit"},
-     {config,  undefined,  "config",   string,      "Indent file(s) and exit"}
+     {dump,    $d,        "dump",    string,  "Dump sourcer db for file"},
+     {port,    $p,        "port",    integer, "LSP server port"},
+     {verbose, $v,        "verbose", integer, "Verbosity level"},
+     {indent,  $i,        "indent",  string,  "Indent file(s) and exit"},
+     {config,  undefined, "config",  string,  "Configuration file"}
     ].
 
 start_server(Opts) ->
