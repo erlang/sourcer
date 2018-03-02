@@ -4,6 +4,23 @@
 -export([sourcer/1]).
 -include_lib("eunit/include/eunit.hrl").
 
+default_indent_prefs_test_() ->
+
+    IndentW2 = 2,
+    PrefC = [{indentW, IndentW2},
+             {'when', 6}
+            ],
+    [?_assertMatch(#{indentW := 4, %% indentW
+                     after_op := 4, %% indentW
+                     'when' := 6, %% IndentW + IndentW div 2
+                     'after_when' := 10}, %% IndentW * 2 + IndentW div 2
+                   sourcer_indent:get_prefs([])),
+     ?_assertMatch(#{indentW := 2, %% indentW
+                     after_op := 2, %% indentW
+                     'when' := 6, %% overriden
+                     'after_when' := 5}, %% IndentW * 2 + IndentW div 2
+                   sourcer_indent:get_prefs(PrefC))].
+
 all_test_() ->
     Dir = filename:dirname(code:which(?MODULE)) ++ "/" ++ ?MODULE_STRING ++ "_data",
     OrigFs = filelib:wildcard(Dir ++ "/*"),
@@ -28,7 +45,7 @@ all_test_() ->
 
 lines_test_() ->
     Basic =
-"foo() ->
+        "foo() ->
     line1,
   line2,
     case X of
@@ -118,5 +135,3 @@ sourcer(File) ->
     Src = unicode:characters_to_list(Bin),
     Indented = sourcer_indent:all(Src),
     file:write_file(File, unicode:characters_to_binary(Indented)).
-
-

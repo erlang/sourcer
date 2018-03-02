@@ -16,6 +16,33 @@ The generic language server uses a TCP connection to talk LSP with clients. It e
 
 This is the "real" server, connecting the generic and specific parts and an adapter from LSP to the 'sourcer' data format (see below) and back.
 
+### Supported Options
+
+```
+ - --dump,    -d,  string,  Dump sourcer db for file;
+ - --port,    -p,  integer, LSP server port;
+ - --verbose, -v,  integer, Verbosity level;
+ - --indent,  -i,  string,  Indent file(s) and exit;
+ - --config,  N/A, string,  Configuration file.
+```
+
+### Configuration
+
+Configuration file contains property list.
+
+Currently we only support these keys:
+
+- `indent` - controls indentation parameters.
+
+Example:
+
+```erlang
+{indent, [{indentW, 2}]}.
+
+```
+
+
+
 ## Language services library `sourcer`
 
 The actual work is done by this application. It is meant to be LSP-agnostic so that it can be used in other contexts and tools.
