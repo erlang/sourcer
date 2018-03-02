@@ -18,13 +18,13 @@ This is the "real" server, connecting the generic and specific parts and an adap
 
 ### Supported Options
 
-```
- - --dump,    -d,  string,  Dump sourcer db for file;
- - --port,    -p,  integer, LSP server port;
- - --verbose, -v,  integer, Verbosity level;
- - --indent,  -i,  string,  Indent file(s) and exit;
- - --config,  N/A, string,  Configuration file.
-```
+ - --help,    -h,  undefined, Shows help;
+ - --dump,    -d,  string,    Dump sourcer db for file;
+ - --port,    -p,  integer,   LSP server port;
+ - --verbose, -v,  integer,   Verbosity level;
+ - --indent,  -i,  string,    Indent file(s) and exit;
+ - --config,  N/A, string,    Configuration file.
+
 
 ### Configuration
 

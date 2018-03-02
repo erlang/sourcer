@@ -7,18 +7,8 @@
 main(Args) ->
     case getopt:parse(cli_options(), Args) of
         {ok, {Opts, Other}} ->
-            Dump = proplists:get_value(dump, Opts),
-            Indent = proplists:get_value(indent, Opts),
-            Verbose = proplists:get_value(verbose, Opts, 0),
-            Config = maybe_load_config(proplists:get_value(config, Opts), Verbose),
-            if Dump =:= undefined, Indent =:= undefined ->
-                    start_server(Opts);
-               is_list(Indent) ->
-                    IndentConfig = proplists:get_value(indent, Config, []),
-                    indent([Indent|Other], IndentConfig, Verbose);
-               is_list(Dump) ->
-                    dump_file(Dump)
-            end;
+            OptsMap = maps:from_list(proplists:unfold(Opts)),
+            run(OptsMap, Other);
         _Err ->
             io:format("Error: ~p~n", [_Err]),
             getopt:usage(cli_options(), "lsp_server")
@@ -26,15 +16,34 @@ main(Args) ->
 
 cli_options() ->
     [
-     {dump,    $d,        "dump",    string,  "Dump sourcer db for file"},
-     {port,    $p,        "port",    integer, "LSP server port"},
-     {verbose, $v,        "verbose", integer, "Verbosity level"},
-     {indent,  $i,        "indent",  string,  "Indent file(s) and exit"},
-     {config,  undefined, "config",  string,  "Configuration file"}
+     {help,    $h,        "help",    undefined, "Show this help"},
+     {dump,    $d,        "dump",    string,    "Dump sourcer db for file"},
+     {port,    $p,        "port",    integer,   "LSP server port"},
+     {verbose, $v,        "verbose", integer,   "Verbosity level"},
+     {indent,  $i,        "indent",  string,    "Indent file(s) and exit"},
+     {config,  undefined, "config",  string,    "Configuration file"}
     ].
 
-start_server(Opts) ->
-    Port = proplists:get_value(port, Opts, ?DEFAULT_PORT),
+run(Opts, Other) ->
+    Verbose = maps:get(verbose, Opts, 0),
+    Config = maybe_load_config(maps:get(config, Opts, undefined), Verbose),
+
+    case Opts of
+        #{help := _} ->
+            getopt:usage(cli_options(), "lsp_server"),
+            erlang:halt(0);
+        #{dump := DumpFile} ->
+            dump_file(DumpFile);
+        #{indent := Indent} ->
+            IndentConfig = proplists:get_value(indent, Config, []),
+            indent([Indent|Other], IndentConfig, Verbose);
+        _ ->
+            ServerConfig = proplists:get_value(server, Config, []),
+            start_server(Opts, ServerConfig)
+    end.
+
+start_server(Opts, Config) ->
+    Port = maps:get(port, Opts, proplists:get_value(port, Config, ?DEFAULT_PORT)),
 
     ok = application:load(lsp_server),
     ok = application:set_env(lsp_server, port, Port),
@@ -50,16 +59,16 @@ start_server(Opts) ->
     end.
 
 maybe_load_config(undefined, _Verbose) ->
-  [];
+    [];
 maybe_load_config(File, Verbose) ->
-  case file:consult(File) of
-    {ok, Config} ->
-      Config;
-    {error, Reason} ->
-      io:format("Error loading config file: ~ts~n", [File]),
-      Verbose > 0 andalso io:format("Reason ~p~n", [Reason]),
-      erlang:halt(1)
-  end.
+    case file:consult(File) of
+        {ok, Config} ->
+            Config;
+        {error, Reason} ->
+            io:format("Error loading config file: ~ts~n", [File]),
+            Verbose > 0 andalso io:format("Reason ~p~n", [Reason]),
+            erlang:halt(1)
+    end.
 
 scan(D) ->
     T = unicode:characters_to_list(D),
