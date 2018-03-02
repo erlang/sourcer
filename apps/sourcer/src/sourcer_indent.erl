@@ -21,37 +21,38 @@
 -define(col(X), {_,{_,X},_,_}).
 -define(loc(X), {_,X,_,_}).
 
-%% TODO: change into multiples of IndentW
-default_indent_prefs() ->
-    [{after_op, 4},        %% indentW
-     {before_arrow, 2},    %% indentW div 2
-     {after_arrow, 4},     %% indentW
-     {clause, 4},          %% indentW
-     {'icr', 8},           %% indentW * 2 from 'case' or 'try' ... icr = if, case, receive
-     {parameters, 2},      %% indentW div 2
-     {'when', 6},          %% indentW + indentW div 2
-     {'after_when', 10},   %% indentW * 2 + indentW div 2 from 'case' or 'try' ...
-     {'fun', 4},           %% indentW
-     {fun_body, 8},        %% indentW * 2
-     {paren, 1},           %% after '(' '[' '#{'
-     {delimiter, -1},      %% line starts with '|' or ',' ';'
-     {delimiter_bin,  1},  %% line starts with ',' after a '<<'
-     {delimiter_clause,  2},  %% line starts with ';' between icr clauses
-     {delimiter_spec, -2},    %% line starts with '|' in specs or types
-     {'<<', 2},            %% '<<' is 2 wide
-     {end_paren, -1},      %% go left 1 when ')' '}' ']'
-     {end_paren2, -2},     %% go left 2 when '>>'
-     {end_block, 0},       %% end aligns with icr start
-     {record_def, 2},      %% indentW div 2
-     {unary_op, 2},        %% indentW div 2
-     {comment_3, 0},       %% start of the line
-     {comment_2, 0},       %% start of the expression
-     {comment_1, 48},      %% column 48
+default_indent_prefs(Prefs) ->
+    IndentW = proplists:get_value(indentW, Prefs, 4),
 
-     {indentW, 4},
+    [{after_op, IndentW},                         %% indentW
+     {before_arrow, IndentW div 2},               %% indentW div 2
+     {after_arrow, IndentW},                      %% indentW
+     {clause, IndentW},                           %% indentW
+     {'icr', IndentW * 2},                        %% indentW * 2 from 'case' or 'try' ... icr = if, case, receive
+     {parameters, IndentW div 2},                 %% indentW div 2
+     {'when', IndentW + IndentW div 2},           %% indentW + indentW div 2
+     {'after_when', IndentW * 2 + IndentW div 2}, %% indentW * 2 + indentW div 2 from 'case' or 'try' ...
+     {'fun', IndentW},                            %% indentW
+     {fun_body, IndentW * 2},                     %% indentW * 2
+     {paren, 1},                                  %% after '(' '[' '#{'
+     {delimiter, -1},                             %% line starts with '|' or ',' ';'
+     {delimiter_bin,  1},                         %% line starts with ',' after a '<<'
+     {delimiter_clause,  2},                      %% line starts with ';' between icr clauses
+     {delimiter_spec, -2},                        %% line starts with '|' in specs or types
+     {'<<', 2},                                   %% '<<' is 2 wide
+     {end_paren, -1},                             %% go left 1 when ')' '}' ']'
+     {end_paren2, -2},                            %% go left 2 when '>>'
+     {end_block, 0},                              %% end aligns with icr start
+     {record_def, IndentW div 2},                 %% indentW div 2
+     {unary_op, IndentW div 2},                   %% indentW div 2
+     {comment_3, 0},                              %% start of the line
+     {comment_2, 0},                              %% start of the expression
+     {comment_1, 48},                             %% column 48
+
+     {indentW, IndentW},
      {use_tabs, false},
-     {tab_len, 8},
-     {suggest, false}      %% Indent empty lines and after eof when editing code
+     {tab_len, IndentW},
+     {suggest, false}                             %% Indent empty lines and after eof when editing code
     ].
 
 %%
@@ -124,7 +125,7 @@ get_prefs([{Key, Value} | Rest], OldP, Acc) ->
     get_prefs(Rest, P, [{Key, Value} | Acc]).
 
 get_prefs(Prefs) ->
-    get_prefs(Prefs, default_indent_prefs(), []).
+    get_prefs(Prefs, default_indent_prefs(Prefs), []).
 
 do_indent_lines(LineNr, To, _Forms, Lines, _Stop, _Prefs)
   when LineNr > To ->
