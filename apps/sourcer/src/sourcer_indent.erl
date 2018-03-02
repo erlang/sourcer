@@ -6,6 +6,10 @@
          lines/3, lines/4
         ]).
 
+-ifdef(TEST).
+-export([get_prefs/1]).
+-endif.
+
 %%-define(DEBUG, true).
 -ifdef(DEBUG).
 -define(D(T), io:format(user, "~p\n", [{??T, ?MODULE, ?LINE, T}])).
