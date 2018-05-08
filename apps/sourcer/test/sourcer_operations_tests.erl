@@ -19,11 +19,13 @@ symbols_test_() ->
         ?_assertEqual([], 
                 sourcer_operations:symbols(<<"">>, DB)),
 
-        ?_assertEqual([
-                {<<"file:///home/vlad/projects/sourcer/_build/test/lib/sourcer/test/operations_data/aaa.erl">>,
-                   {def,[{module,aaa},{function,mmm,0}],
-                        {{10,1},{10,4}},
-                        #{body => {{10,1},{11,7}}}}}
+        %% TODO how to get the real file URI?
+        ?_assertMatch([
+                    {_, 
+                        {def,[{module,aaa},{function,mmm,0}],
+                            {{10,1},{10,4}},
+                            #{body := {{10,1},{11,7}}}}
+                    }
                 ],
                 sourcer_operations:symbols(<<"mm">>, DB))
     ].
