@@ -1,10 +1,13 @@
 %% @author jakob
 %% @doc @todo Add description to sourcer_scan_util.
 
-
 -module(sourcer_scan_util).
 
--export([split_lines_w_lengths/1, find_line_w_offset/2, get_lines_info/1]).
+-export([
+    split_lines_w_lengths/1, 
+    find_line_w_offset/2, 
+    get_lines_info/1
+]).
 
 %% [{Length, TextIncNL}...]
 split_lines_w_lengths(Text) ->

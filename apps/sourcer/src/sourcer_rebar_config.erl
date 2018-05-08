@@ -96,7 +96,7 @@ consult_file_(File) ->
                     {ok, Terms} = consult_and_eval(File, Script),
                     Terms;
                 false ->
-                    rebar_file_utils:try_consult(File)
+                    try_consult(File)
             end
     end.
 
@@ -127,7 +127,7 @@ format_error({bad_dep_name, Dep}) ->
                               {ok, Terms::[term()]} |
                               {error, Reason::term()}.
 consult_and_eval(File, Script) ->
-    StateData = rebar_file_utils:try_consult(File),
+    StateData = try_consult(File),
     %% file:consult/1 always returns the terms as a list, however file:script
     %% can (and will) return any kind of term(), to make consult_and_eval
     %% work the same way as eval we ensure that when no list is returned we
@@ -163,6 +163,20 @@ config_file() ->
         ConfigFile ->
             ConfigFile
     end.
+
+-include_lib("kernel/include/file.hrl").
+
+try_consult(File) ->
+    case file:consult(File) of
+        {ok, Terms} ->
+            Terms;
+        {error, enoent} ->
+            [];
+        {error, Reason} ->
+            throw(?PRV_ERROR({bad_term_file, File, Reason}))
+    end.
+
+
 
 -ifdef(TEST).
 

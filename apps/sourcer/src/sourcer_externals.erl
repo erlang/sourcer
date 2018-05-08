@@ -177,7 +177,7 @@ get_external_1(FileName0, PathVars, IsRoot) ->
                     true ->
                         case file:read_file(FileName) of
                             {ok, B} ->
-                                sourcer_util:split_lines(B);
+                                sourcer_scan:split_lines(B);
                             _ ->
                                 [FileName]
                         end;
@@ -212,7 +212,7 @@ fx2(FN, Fun, Fun2, PathVars, Parent, Done, Acc) ->
     NewAcc = Fun2(Parent, FN, Acc),
     case file:read_file(FN) of
         {ok, B} ->
-            Lines = sourcer_util:split_lines(B),
+            Lines = sourcer_scan:split_lines(B),
             fx(Lines, Fun, Fun2, PathVars, FN, [FN | Done], NewAcc);
         _ ->
             {Done, Acc}

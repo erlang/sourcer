@@ -65,19 +65,26 @@ start(Port, Server, Client, Options) ->
 loop(Socket, Server, Client, Options, Buf, Pending, Results) ->
 	receive
 		{notify, Method, Params} ->
+			%?TRACE("Notify ~p", [Method]),
 			notify(Socket, Method, Params),
 			loop(Socket, Server, Client, Options, Buf, Pending, Results);
 		{request, Id, Method, Params} ->
+			%?TRACE("Request ~w ~p", [Id, Method]),
 			request(Socket, Id, Method, Params),
 			loop(Socket, Server, Client, Options, Buf, Pending, Results);
 		{request, Id, Method} ->
+			%?TRACE("Request ~w ~p", [Id, Method]),
 			request(Socket, Id, Method),
 			loop(Socket, Server, Client, Options, Buf, Pending, Results);
 		{reply, Id, Answer} ->
+			%?TRACE("Reply ~w ~p~n", [Id, Answer]),
 			Results1 = [{Id, Answer} | Results],
+			%?TRACE("Reply queue:: ~p~n", [Results1]),
 			{NewPending, NewResults} = send_replies(Socket, Pending, Options, Results1),
+			%?TRACE("Sent!?:: ~p~n", [{NewPending, NewResults}]),
 			loop(Socket, Server, Client, Options, Buf, NewPending, NewResults);
 		{tcp, Socket, Data} ->
+			%?TRACE("TCP", []),
 			Buf2 = <<Buf/binary, Data/binary>>,
 			{ok, Msgs, Buf3} = try_decode(Buf2),
 			NewPending = process_messages(Msgs, Pending, Server, Client),
@@ -231,20 +238,25 @@ reply(_Socket, Id, Msg) ->
 send_replies(Socket, Pending, Options, Results) -> 
 	case proplists:get_value(ordered_replies, Options, true) of
 		true ->
+			%?TRACE("ORDERED...",[]),
 			send_ordered_replies(Socket, Pending, Results);
 		false ->
 			[reply(Socket, Id, Answer) || {Id, Answer} <- Results]
 	end.
 
 send_ordered_replies(Socket, Pending, Results) ->
+	%?TRACE(" -- ~p", [queue:peek(Pending)]),
 	case queue:peek(Pending) of	
 		empty ->
+			%?TRACE("  -- empty ", []), 
 			{Pending, Results};
 		{value, Id} ->
 			case lists:keyfind(Id, 1, Results) of
 				false ->
+					%?TRACE("  -- not found ", []), 
 					{Pending, Results};
 				{Id, Answer} ->
+					%?TRACE("  -- R:: ~p", [Id]), 
 					reply(Socket, Id, Answer), 
 					{_, Rest} = queue:out(Pending),
 					send_ordered_replies(Socket, Rest, lists:keydelete(Id, 1, Results)) 
@@ -254,6 +266,7 @@ send_ordered_replies(Socket, Pending, Results) ->
 send_tcp(Socket, Ans) ->
 	Json = jsx:encode(encode(Ans)),
 	Hdr = io_lib:format("Content-Length: ~w\r\n\r\n", [size(Json)]),
+	%?DEBUG("TCP:: ~s~n", [[Hdr, Json]]),
 	_ = gen_tcp:send(Socket, Hdr),
 	_ = gen_tcp:send(Socket, Json),
 	ok.

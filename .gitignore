@@ -4,3 +4,5 @@ erl_crash.dump
 *.scan
 tmp/
 erlang_ls
+
+*.crashdump

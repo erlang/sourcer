@@ -33,11 +33,11 @@
     ],
     {
         [
-            {[{macro,'X',-1}],{{2,9},{2,10}}, #{body=>{{2,1},{2,15}}, comments=>{{0,1},{1,9}}}},
-            {[{macro,'X',-1},{var,'X'}],{{2,11},{2,12}}, #{}}
+            {def,[{macro,'X',-1,0}],{{2,9},{2,10}}, #{body=>{{2,1},{2,15}}, comments=>{{0,1},{1,9}}}},
+            {def,[{macro,'X',-1,0},{var,'X'}],{{2,11},{2,12}}, #{}}
         ],
         [
-            {[{macro,'X',-1},{var,'X'}],{{2,13},{2,14}}}
+            {ref,[{macro,'X',-1,0},{var,'X'}],{{2,13},{2,14}}}
         ]
     }
 }.
@@ -55,12 +55,12 @@
     ],
     {
         [
-            {[{macro,'Z',2}],{{1,9},{1,10}},#{body=>{{1,1},{1,19}},comments=>{{0,1},{0,5}}}},
-            {[{macro,'Z',2},{var,'A'}],{{1,11},{1,12}},#{}},
-            {[{macro,'Z',2},{var,'BB'}],{{1,13},{1,15}},#{}}
+            {def,[{macro,'Z',2,0}],{{1,9},{1,10}},#{body=>{{1,1},{1,19}},comments=>{{0,1},{0,5}}}},
+            {def,[{macro,'Z',2,0},{var,'A'}],{{1,11},{1,12}},#{}},
+            {def,[{macro,'Z',2,0},{var,'BB'}],{{1,13},{1,15}},#{}}
         ],
         [
-            {[{macro,'Z',2},{var,'A'}],{{1,17},{1,18}}}
+            {ref,[{macro,'Z',2,0},{var,'A'}],{{1,17},{1,18}}}
         ]
     }
 }.
@@ -73,7 +73,7 @@
     ],
     {
         [],
-        [{[{include_lib, "file"}], {{1,14},{1,20}}}]
+        [{ref,[{include_lib, "file"}], {{1,14},{1,20}}}]
     }
 }.
 
@@ -85,7 +85,7 @@
     ],
     {
         [],
-        [{[{include, "file"}], {{1,10},{1,16}}}]
+        [{ref,[{include, "file"}], {{1,10},{1,16}}}]
     }
 }.
 
@@ -107,7 +107,7 @@
     [{module,x,{{0,1},{0,5}},{{1,9},{1,10}}}],
     {
         [
-            {[{module,x}],{{1,9},{1,10}},#{comments=>{{0,1},{0,5}}}}
+            {def,[{module,x}],{{1,9},{1,10}},#{comments=>{{0,1},{0,5}}}}
         ],
         []
     }
@@ -124,8 +124,8 @@
     {
         [],
         [
-            {[{module,mmm},{function,a,1}], {{1,15},{1,18}}},
-            {[{module,mmm},{function,b,2}], {{1,19},{1,22}}}
+            {ref,[{module,mmm},{function,a,1}], {{1,15},{1,18}}},
+            {ref,[{module,mmm},{function,b,2}], {{1,19},{1,22}}}
         ]
     }
 }.
@@ -141,8 +141,8 @@
     {
         [],
         [
-            {[{type,a,1}],{{1,15},{1,18}}},
-            {[{type,b,2}],{{1,19},{1,22}}}
+            {ref,[{type,a,1}],{{1,15},{1,18}}},
+            {ref,[{type,b,2}],{{1,19},{1,22}}}
         ]
     }
 }.
@@ -158,8 +158,8 @@
     {
         [],
         [
-            {[{function,a,1}],{{1,10},{1,13}}},
-            {[{function,b,2}],{{1,14},{1,17}}}
+            {ref,[{function,a,1}],{{1,10},{1,13}}},
+            {ref,[{function,b,2}],{{1,14},{1,17}}}
         ]
     }
 }.
@@ -177,13 +177,13 @@
     ],
     {
         [
-            {[{var,'Y'}],{{1,25},{1,26}},#{}},
-            {[{function,bar,1}],none,
+            {def,[{var,'Y'}],{{1,25},{1,26}},#{}},
+            {def,[{function,bar,1}],none,
                 #{spec_comments => {{0,1},{0,5}},
                 spec => {{1,1},{1,27}}}}
         ],
         [
-            {[{function,bar,1}],{{1,11},{1,14}}}
+            {ref,[{function,bar,1}],{{1,11},{1,14}}}
         ]
     }
 }.
@@ -213,13 +213,13 @@
     ],
     {
         [
-           {[{module,m},{function,bar,0}],none,#{spec_comments => none,spec => {{2,1},{2,28}}}},
-           {[{function,foo,2}],none,#{spec_comments => {{0,1},{0,5}},spec => {{1,1},{1,52}}}}
+           {def,[{module,m},{function,bar,0}],none,#{spec_comments => none,spec => {{2,1},{2,28}}}},
+           {def,[{function,foo,2}],none,#{spec_comments => {{0,1},{0,5}},spec => {{1,1},{1,52}}}}
         ],
         [
-            {[{module,g},{type,myatom,0}],{{2,20},{2,26}}},
-            {[{module,m},{function,bar,0}],{{2,9},{2,12}}},
-            {[{function,foo,2}],{{1,7},{1,10}}}
+            {ref,[{module,g},{type,myatom,0}],{{2,20},{2,26}}},
+            {ref,[{module,m},{function,bar,0}],{{2,9},{2,12}}},
+            {ref,[{function,foo,2}],{{1,7},{1,10}}}
         ]
     }
 }.
@@ -236,7 +236,7 @@
     ],
     {
         [
-            {[{type,foo,0}],{{1,9},{1,12}},#{body=>{{1,1},{1,26}},comments=>{{0,1},{0,5}}}}
+            {def,[{type,foo,0}],{{1,9},{1,12}},#{body=>{{1,1},{1,26}},comments=>{{0,1},{0,5}}}}
         ],
         [
         ]
@@ -255,10 +255,10 @@
     ],
     {
         [
-            {[{type,foo,0}],{{1,7},{1,10}},#{body=>{{1,1},{1,27}},comments=>{{0,1},{0,5}}}}
+            {def,[{type,foo,0}],{{1,7},{1,10}},#{body=>{{1,1},{1,27}},comments=>{{0,1},{0,5}}}}
         ],
         [
-            {[{type,my_integer,0}],{{1,15},{1,25}}}
+            {ref,[{type,my_integer,0}],{{1,15},{1,25}}}
         ]
     }
 }.
@@ -275,12 +275,12 @@
     ],
     {
         [
-            {[{type,foo,0}],
+            {def,[{type,foo,0}],
                 {{1,7},{1,10}},
                 #{body=>{{1,1},{1,23}},comments => {{0,1},{0,5}}}}
         ],
         [
-            {[{record,arec}],{{1,16},{1,20}}}
+            {ref,[{record,arec}],{{1,16},{1,20}}}
         ]
     }
 }.
@@ -309,14 +309,14 @@
     ],
     {
         [
-            {[{record,r}],{{1,9},{1,10}},#{body=>{{1,1},{1,43}},comments => {{0,1},{0,5}}}},
-            {[{record,r},{field,a}],{{1,12},{1,13}},#{}},
-            {[{record,r},{field,b}],{{1,21},{1,22}},#{}},
-            {[{record,r},{field,c}],{{1,23},{1,24}},#{}},
-            {[{record,r},{field,d}],{{1,27},{1,28}},#{}}
+            {def,[{record,r}],{{1,9},{1,10}},#{body=>{{1,1},{1,43}},comments => {{0,1},{0,5}}}},
+            {def,[{record,r},{field,a}],{{1,12},{1,13}},#{}},
+            {def,[{record,r},{field,b}],{{1,21},{1,22}},#{}},
+            {def,[{record,r},{field,c}],{{1,23},{1,24}},#{}},
+            {def,[{record,r},{field,d}],{{1,27},{1,28}},#{}}
         ],
         [
-            {[{module,x},{type,baz,0}],{{1,33},{1,36}}}
+            {ref,[{module,x},{type,baz,0}],{{1,33},{1,36}}}
         ]
     }
 }.
@@ -351,7 +351,7 @@ foo(1,[2,3]) -> ok.",
     ],
     {
         [
-            {[{function,foo,2}],{{1,1},{1,4}},#{body=>{{1,1},{1,19}},comments=>{{0,1},{0,5}}}}
+            {def,[{function,foo,2}],{{1,1},{1,4}},#{body=>{{1,1},{1,19}},comments=>{{0,1},{0,5}}}}
         ],
         []
     }
@@ -372,12 +372,12 @@ foo(Xx) when Xx==0 -> Xx.",
     ],
     {
         [
-            {[{function,foo,1},{clause,1},{var,'Xx'}],{{1,5},{1,7}},#{}},
-            {[{function,foo,1}],{{1,1},{1,4}},#{body=>{{1,1},{1,25}},comments=>{{0,1},{0,5}}}}
+            {def,[{function,foo,1},{clause,1},{var,'Xx'}],{{1,5},{1,7}},#{}},
+            {def,[{function,foo,1}],{{1,1},{1,4}},#{body=>{{1,1},{1,25}},comments=>{{0,1},{0,5}}}}
         ],
         [
-            {[{function,foo,1},{clause,1},{var,'Xx'}],{{1,14},{1,16}}},
-            {[{function,foo,1},{clause,1},{var,'Xx'}],{{1,23},{1,25}}}
+            {ref,[{function,foo,1},{clause,1},{var,'Xx'}],{{1,14},{1,16}}},
+            {ref,[{function,foo,1},{clause,1},{var,'Xx'}],{{1,23},{1,25}}}
         ]
     }
 }.
@@ -394,7 +394,7 @@ foo() -> ok.",
     ],
     {
         [
-            {[{function,foo,0}],{{1,1},{1,4}},#{body=>{{1,1},{1,12}},comments=>{{0,1},{0,8}}}}
+            {def,[{function,foo,0}],{{1,1},{1,4}},#{body=>{{1,1},{1,12}},comments=>{{0,1},{0,8}}}}
         ],
         []
     }
@@ -421,13 +421,13 @@ foo(A,b) -> A, ok2.",
     ],
     {
         [
-            {[{function,foo,2}],{{1,1},{1,4}},#{body=>{{1,1},{2,19}},comments=>{{0,1},{0,5}}}},
-            {[{function,foo,2},{clause,1},{var,'A'}],{{1,5},{1,6}},#{}},
-            {[{function,foo,2},{clause,2},{var,'A'}],{{2,5},{2,6}},#{}}
+            {def,[{function,foo,2}],{{1,1},{1,4}},#{body=>{{1,1},{2,19}},comments=>{{0,1},{0,5}}}},
+            {def,[{function,foo,2},{clause,1},{var,'A'}],{{1,5},{1,6}},#{}},
+            {def,[{function,foo,2},{clause,2},{var,'A'}],{{2,5},{2,6}},#{}}
         ],
         [
-            {[{function,foo,2},{clause,1},{var,'A'}],{{1,17},{1,18}}},
-            {[{function,foo,2},{clause,2},{var,'A'}],{{2,13},{2,14}}}
+            {ref,[{function,foo,2},{clause,1},{var,'A'}],{{1,17},{1,18}}},
+            {ref,[{function,foo,2},{clause,2},{var,'A'}],{{2,13},{2,14}}}
         ]
     }
 }.
@@ -454,15 +454,15 @@ foo() -> ok.",
     ],
     {
         [
-            {[{module,mx}],{{1,9},{1,11}},#{comments=>{{0,1},{0,7}}}},
-            {[{module,mx},{function,foo,0}],{{5,1},{5,4}},#{
+            {def,[{module,mx}],{{1,9},{1,11}},#{comments=>{{0,1},{0,7}}}},
+            {def,[{module,mx},{function,foo,0}],{{5,1},{5,4}},#{
                 body=>{{5,1},{5,12}},
                 comments=>{{4,1},{4,5}},
                 spec_comments => {{2,1},{2,7}},
                 spec => {{3,1},{3,20}}}}
         ],
         [
-            {[{module,mx},{function,foo,0}],{{3,7},{3,10}}}
+            {ref,[{module,mx},{function,foo,0}],{{3,7},{3,10}}}
         ]
     }
 }.
@@ -493,17 +493,17 @@ foo() -> ?A, ?A(), ?A(?X,X).
     ],
     {
         [
-            {[{function,foo,0}],{{3,1},{3,4}},#{body=>{{3,1},{3,28}}}},
-            {[{function,foo,0},{clause,1},{var,'X'}],{{3,26},{3,27}},#{}},
-            {[{macro,'A',-1}],{{0,9},{0,10}},#{body=>{{0,1},{0,17}}}},
-            {[{macro,'A',-1}],{{2,9},{2,10}},#{body=>{{2,1},{2,18}}}},
-            {[{macro,'A',0}],{{1,9},{1,10}},#{body=>{{1,1},{1,20}}}}
+            {def,[{function,foo,0}],{{3,1},{3,4}},#{body=>{{3,1},{3,28}}}},
+            {def,[{function,foo,0},{clause,1},{var,'X'}],{{3,26},{3,27}},#{}},
+            {def,[{macro,'A',-1,0}],{{0,9},{0,10}},#{body=>{{0,1},{0,17}}}},
+            {def,[{macro,'A',-1,0}],{{2,9},{2,10}},#{body=>{{2,1},{2,18}}}},
+            {def,[{macro,'A',0,0}],{{1,9},{1,10}},#{body=>{{1,1},{1,20}}}}
         ],
         [
-            {[{macro,'A',-1}],{{3,10},{3,12}}},
-            {[{macro,'A',0}],{{3,14},{3,16}}},
-            {[{macro,'A',2}],{{3,20},{3,22}}},
-            {[{macro,'X',-1}],{{3,23},{3,25}}}
+            {ref,[{macro,'A',-1,0}],{{3,10},{3,12}}},
+            {ref,[{macro,'A',0,0}],{{3,14},{3,16}}},
+            {ref,[{macro,'A',2,0}],{{3,20},{3,22}}},
+            {ref,[{macro,'X',-1,0}],{{3,23},{3,25}}}
         ]
     }
 }.
@@ -585,38 +585,38 @@ quux()->ok.
     ],
     {
         [
-            {[{function,bar,1}],{{0,1},{0,4}},#{body => {{0,1},{10,14}}}},
-            {[{function,bar,1},{clause,1},{field,gf}],{{6,5},{6,7}},#{}},
-            {[{function,bar,1},{clause,1},{var,'Qok'}],{{9,1},{9,4}},#{}},
-            {[{function,bar,1},{clause,1},{var,'X'}],{{0,8},{0,9}},#{}},
-            {[{function,bar,1},{clause,1},{var,'Y'}],{{6,10},{6,11}},#{}},
-            {[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'A'}],{{7,5},{7,6}},#{}},
-            {[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'X'}],{{7,11},{7,12}},#{}},
-            {[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'B'}],{{7,16},{7,17}},#{}},
-            {[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'Y'}],{{7,22},{7,23}},#{}},
-            {[{function,bar,1},{clause,1},{function,'Z',1}],{{8,5},{8,6}},#{}},
-            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'A'}],{{8,7},{8,8}},#{}},
-            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'X'}],{{8,13},{8,14}},#{}},
-            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'B'}],{{8,18},{8,19}},#{}},
-            {[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'Y'}],{{8,24},{8,25}},#{}},
-            {[{function,bar,1},{clause,2},{var,'X'}],{{10,7},{10,8}},#{}},
-            {[{function,quux,0}],{{12,1},{12,5}},#{body => {{12,1},{12,11}}}},
-            {[{type,foo,0}],{{13,7},{13,10}},#{body => {{13,1},{13,21}}}}
+            {def,[{function,bar,1}],{{0,1},{0,4}},#{body => {{0,1},{10,14}}}},
+            {def,[{function,bar,1},{clause,1},{field,gf}],{{6,5},{6,7}},#{}},
+            {def,[{function,bar,1},{clause,1},{var,'Qok'}],{{9,1},{9,4}},#{}},
+            {def,[{function,bar,1},{clause,1},{var,'X'}],{{0,8},{0,9}},#{}},
+            {def,[{function,bar,1},{clause,1},{var,'Y'}],{{6,10},{6,11}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'A'}],{{7,5},{7,6}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,1,1},{clause,1},{var,'X'}],{{7,11},{7,12}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'B'}],{{7,16},{7,17}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,1,1},{clause,2},{var,'Y'}],{{7,22},{7,23}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,'Z',1}],{{8,5},{8,6}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'A'}],{{8,7},{8,8}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,'Z',1},{clause,1},{var,'X'}],{{8,13},{8,14}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'B'}],{{8,18},{8,19}},#{}},
+            {def,[{function,bar,1},{clause,1},{function,'Z',1},{clause,2},{var,'Y'}],{{8,24},{8,25}},#{}},
+            {def,[{function,bar,1},{clause,2},{var,'X'}],{{10,7},{10,8}},#{}},
+            {def,[{function,quux,0}],{{12,1},{12,5}},#{body => {{12,1},{12,11}}}},
+            {def,[{type,foo,0}],{{13,7},{13,10}},#{body => {{13,1},{13,21}}}}
         ],
         [
-            {[{macro,'MODULE',none}], {{4,1}, {4,8}}},
-            {[{function,g,0}],{{4,9},{4,10}}},
-            {[{module,d},{function,g,1}],{{3,3},{3,4}}},
-            {[{module,m},{function,f,3}],{{1,7},{1,8}}},
-            {[{record,fg}],{{6,2},{6,4}}},
-            {[{record,rr}],{{5,2},{5,4}}},
-            {[{record,rr},{field,ff}],{{5,5},{5,7}}},
-            {[{function,b,2}],{{2,1},{2,2}}},
-            {[{function,bar,1},{clause,1},{var,'X'}],{{9,5},{9,6}}},
-            {[{function,g,1}],{{6,8},{6,9}}},
-            {[{macro,'Z',-1}],{{3,5},{3,7}}},
-            {[{macro,z,-1}],{{2,3},{2,5}}},
-            {[{type,bar,0}],{{13,16},{13,19}}}
+            {ref,[{macro,'MODULE',-1,0}], {{4,1}, {4,8}}},
+            {ref,[{function,g,0}],{{4,9},{4,10}}},
+            {ref,[{module,d},{function,g,1}],{{3,3},{3,4}}},
+            {ref,[{module,m},{function,f,3}],{{1,7},{1,8}}},
+            {ref,[{record,fg}],{{6,2},{6,4}}},
+            {ref,[{record,rr}],{{5,2},{5,4}}},
+            {ref,[{record,rr},{field,ff}],{{5,5},{5,7}}},
+            {ref,[{function,b,2}],{{2,1},{2,2}}},
+            {ref,[{function,bar,1},{clause,1},{var,'X'}],{{9,5},{9,6}}},
+            {ref,[{function,g,1}],{{6,8},{6,9}}},
+            {ref,[{macro,'Z',-1,0}],{{3,5},{3,7}}},
+            {ref,[{macro,z,-1,0}],{{2,3},{2,5}}},
+            {ref,[{type,bar,0}],{{13,16},{13,19}}}
         ]
     }
 }.
@@ -666,28 +666,28 @@ quux()->ok.
     {
         [
             % todo
-            {[{type,f1,0}],
+            {def,[{type,f1,0}],
                     {{0,7},{0,9}},
                     #{body => {{0,1},{0,20}}}},
-            {[{type,f2,0}],
+            {def,[{type,f2,0}],
                     {{1,7},{1,9}},
                     #{body => {{1,1},{1,28}}}},
-            {[{type,f2,0},{function,1,1},{clause,1},{var,'X'}],
+            {def,[{type,f2,0},{function,1,1},{clause,1},{var,'X'}],
                     {{1,26},{1,27}},
                     #{}},
-            {[{type,f3,1}],
+            {def,[{type,f3,1}],
                     {{2,7},{2,9}},
                     #{body => {{2,1},{2,32}}}},
-            {[{type,f3,1},{function,1,1},{clause,1},{var,'X'}],
+            {def,[{type,f3,1},{function,1,1},{clause,1},{var,'X'}],
                     {{2,30},{2,31}},
                     #{}},
-            {[{type,f4,0}],
+            {def,[{type,f4,0}],
                     {{3,7},{3,9}},
                     #{body => {{3,1},{3,26}}}},
-            {[{type,f4,0},{function,1,1},{clause,1},{var,'X'}],
+            {def,[{type,f4,0},{function,1,1},{clause,1},{var,'X'}],
                     {{3,24},{3,25}},
                     #{}},
-            {[{type,f4,0},{function,1,1},{clause,1},{var,'Y'}],
+            {def,[{type,f4,0},{function,1,1},{clause,1},{var,'Y'}],
                     {{3,20},{3,21}},
                     #{}}
         ],
@@ -715,14 +715,14 @@ quux()->ok.
     ],
     {
         [
-            {[{type,f1,2}],{{0,7},{0,9}},#{body => {{0,1},{0,35}}}},
-            {[{type,f1,2},{var,'X'}],{{0,10},{0,11}},#{}},
-            {[{type,f1,2},{var,'Y'}],{{0,13},{0,14}},#{}},
-            {[{type,f1,2},{function,1,1},{clause,1},{var,'X'}],{{0,28},{0,29}},#{}}
+            {def,[{type,f1,2}],{{0,7},{0,9}},#{body => {{0,1},{0,35}}}},
+            {def,[{type,f1,2},{var,'X'}],{{0,10},{0,11}},#{}},
+            {def,[{type,f1,2},{var,'Y'}],{{0,13},{0,14}},#{}},
+            {def,[{type,f1,2},{function,1,1},{clause,1},{var,'X'}],{{0,28},{0,29}},#{}}
         ],
         [
-            {[{type,f1,2},{var,'Y'}],{{0,20},{0,21}}},
-            {[{type,f1,2},{function,1,1},{clause,1},{var,'X'}],{{0,32},{0,33}}}
+            {ref,[{type,f1,2},{var,'Y'}],{{0,20},{0,21}}},
+            {ref,[{type,f1,2},{function,1,1},{clause,1},{var,'X'}],{{0,32},{0,33}}}
         ]
     }
 }.
@@ -745,14 +745,14 @@ quux()->ok.
     ],
     {
         [
-            {[{function,qwe,2}],{{0,1},{0,4}},#{body=>{{0,1},{0,23}}}},
-            {[{function,qwe,2},{clause,1},{var,'X'}],{{0,5},{0,6}},#{}},
-            {[{function,qwe,2},{clause,1},{var,'Y'}],{{0,8},{0,9}},#{}}
+            {def,[{function,qwe,2}],{{0,1},{0,4}},#{body=>{{0,1},{0,23}}}},
+            {def,[{function,qwe,2},{clause,1},{var,'X'}],{{0,5},{0,6}},#{}},
+            {def,[{function,qwe,2},{clause,1},{var,'Y'}],{{0,8},{0,9}},#{}}
         ],
         [
-            {[{function,max,2}],{{0,14},{0,17}}},
-            {[{function,qwe,2},{clause,1},{var,'X'}],{{0,18},{0,19}}},
-            {[{function,qwe,2},{clause,1},{var,'Y'}],{{0,21},{0,22}}}
+            {ref,[{function,max,2}],{{0,14},{0,17}}},
+            {ref,[{function,qwe,2},{clause,1},{var,'X'}],{{0,18},{0,19}}},
+            {ref,[{function,qwe,2},{clause,1},{var,'Y'}],{{0,21},{0,22}}}
         ]
     }
 }.

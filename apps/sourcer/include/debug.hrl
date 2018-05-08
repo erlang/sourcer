@@ -3,8 +3,10 @@
 %-define(Info(T), sourcer_log:erlangLog(?MODULE, ?LINE, info, T)).
 
 -ifdef(DEBUG).
--define(D(T), io:format("~p\n", [{??T, ?MODULE, ?LINE, T}])).
+-define(D(F, T), io:format(F, T)).
+-define(D(T), ?D("~p\n", [{??T, ?MODULE, ?LINE, T}])).
 -else.
+-define(D(F,T), ok).
 -define(D(T), ok).
 -endif.
 

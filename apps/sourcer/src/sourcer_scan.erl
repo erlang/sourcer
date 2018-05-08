@@ -54,12 +54,14 @@ get_indent(String) ->
          (C >= $\000 andalso C =< $\s orelse C >= $\200 andalso C =< $\240)).
 is_white_space(C) -> ?WHITE_SPACE(C).
 
--spec split_lines(string()) -> [string()].
+-spec split_lines(string()|binary()) -> [string()].
+split_lines(Str) when is_binary(Str) ->
+    split_lines(unicode:characters_to_list(Str));
 split_lines(Str) ->
     split_lines(Str, []).
 
 split_lines("\n" ++ Rest, Line) ->
-    [lists:reverse(Line, "\n")|split_lines(Rest,[])];
+    [lists:reverse(Line, "\n") | split_lines(Rest,[])];
 split_lines([C|Rest], Line) ->
     split_lines(Rest, [C|Line]);
 split_lines([], Line) ->

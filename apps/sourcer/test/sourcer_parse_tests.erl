@@ -3,7 +3,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -include("sourcer_parse.hrl").
--include("sourcer_db.hrl").
+-include("sourcer_model.hrl").
 
 -define(DEBUG, true).
 -include("debug.hrl").
@@ -18,7 +18,7 @@ assert(Exp, Val) ->
     {Val, ?_assertEqual(Expected, Value)}.
 
 parse_test_() ->
-    {ok, Terms} = file:consult("apps/sourcer/test/parser_db_tests_data"),
+    {ok, Terms} = file:consult("apps/sourcer/test/parser_model_tests_data"),
     [assert(Y, X) || {X,Y,_}<-lists:reverse(Terms)].
 
 scan(D) ->

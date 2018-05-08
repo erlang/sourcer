@@ -17,7 +17,9 @@ main(Args) ->
 cli_options() ->
     [
      {help,    $h,        "help",    undefined, "Show this help"},
-     {dump,    $d,        "dump",    string,    "Dump sourcer db for file"},
+     {dump,    $d,        "dump",    string,    "Dump sourcer db for file or project"},
+     {format,  undefined, "fmt",     {atom, raw},    "Format for the dump (default: raw)"},
+     {out,     undefined, "out",     {string, standard_io},    "Destination file for the dump (default: standard_io)"},
      {port,    $p,        "port",    integer,   "LSP server port"},
      {verbose, $v,        "verbose", integer,   "Verbosity level"},
      {indent,  $i,        "indent",  string,    "Indent file(s) and exit"},
@@ -27,13 +29,23 @@ cli_options() ->
 run(Opts, Other) ->
     Verbose = maps:get(verbose, Opts, 0),
     Config = maybe_load_config(maps:get(config, Opts, undefined), Verbose),
-
     case Opts of
         #{help := _} ->
-            getopt:usage(cli_options(), "lsp_server"),
+            getopt:usage(cli_options(), "erlang_ls", "", [
+                    {"", ""},
+                    {"Start LS:", "'erlang_ls -P <nnnn>'"},
+                    {"Indent  :", "'erlang_ls -i <files>'"},
+                    {"Dump    :", "'erlang_ls -d <files> -fmt <fmt> -out <file>'"}
+                ]),
             erlang:halt(0);
-        #{dump := DumpFile} ->
-            dump_file(DumpFile);
+        #{dump:=DumpFile, format:=Fmt, out:=Out} ->
+            Out1 = case Out of
+                    "standard_io" ->
+                        standard_io;
+                    _ ->
+                        Out
+                end,
+            sourcer_dump:dump(DumpFile, Fmt, Out1);
         #{indent := Indent} ->
             IndentConfig = proplists:get_value(indent, Config, []),
             indent([Indent|Other], IndentConfig, Verbose);
@@ -69,25 +81,6 @@ maybe_load_config(File, Verbose) ->
             Verbose > 0 andalso io:format("Reason ~p~n", [Reason]),
             erlang:halt(1)
     end.
-
-scan(D) ->
-    T = unicode:characters_to_list(D),
-    {ok, Ts, _} = sourcer_scan:string(T),
-    sourcer_scan:filter_ws_tokens(Ts).
-
-dump_file(File) ->
-    io:format("Dump: ~tp~n", [File]),
-    {ok, Content} = file:read_file(File),
-    {ST,Tokens} = timer:tc(fun() -> scan(Content) end),
-    {PT,ParseTree} = timer:tc(fun() -> sourcer_parse:parse(Tokens) end),
-    {AT, {model,_,D,R}} = timer:tc(fun() -> sourcer_db:analyse(ParseTree) end),
-    C = case io:columns() of {ok, Cc} -> Cc; _ -> 80 end,
-    io:format("Definitions:::~n~*p~n-----~n", [C, lists:sort(D)]),
-    io:format("References:::~n~*p~n-----~n", [C, lists:sort(R)]),
-    io:format("Scan:    ~.6wms~n", [ST div 1000]),
-    io:format("Parse:   ~.6wms~n", [PT div 1000]),
-    io:format("Analyze: ~.6wms~n", [AT div 1000]),
-    ok.
 
 indent([File|Files], Config, Verbose) ->
     try case file:read_file(File) of

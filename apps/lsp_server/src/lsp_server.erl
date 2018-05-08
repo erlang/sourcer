@@ -133,7 +133,8 @@ start_worker(Id, Method, Params, State) ->
 							sourcer:Method(UserState, Params, Reporter)
 						catch _:E ->
 							?DEBUG("####################~nERROR: ~p ~n", [E]),
-							Mod:default_answer(Method)
+							% Mod:default_answer(Method)
+							null
 						end;
 					false ->
 						io:format("Unsupported request: ~p~n", [Method])
@@ -141,7 +142,8 @@ start_worker(Id, Method, Params, State) ->
 				end
 		end,
 	Replier = fun({_, nothing}) ->
-				reply(Id, Mod:default_answer(Method));
+				Answer = null, %Mod:default_answer(Method),
+				reply(Id, Answer);
 			({_, Answer}) ->
 				reply(Id, Answer)
 		end,

@@ -12,11 +12,11 @@
 -define(DEBUG, 1).
 -include("debug.hrl").
 
--include("sourcer_db.hrl").
+-include("sourcer_model.hrl").
 
 -define(util, sourcer_parse_util).
 
--spec parse([sourcer_scan:token()]) -> {ok, [any()]}.
+-spec parse([sourcer_scan:token()]) -> [any()].
 parse(Tokens) ->
     Forms = ?util:split_at_token(Tokens, dot),
     lists:flatten([parse_form(F, Dot) || {F, {_,Dot,_,_}}<-Forms]).
@@ -199,9 +199,6 @@ parse_exprs(Ts) ->
     Exprs = ?util:split_at_token(Ts, ','),
     lists:flatten([parse_expr(E) || {E, _}<-Exprs]).
 
-parse_expr_list(L) ->
-    [parse_expr(E) || E<-L].
-
 parse_expr([]) ->
     [];
 parse_expr(none) ->
@@ -232,7 +229,7 @@ parse_expr([?k('fun')=F|T]) ->
 parse_expr([{macro,P,N,_}, ?k(?LPAR)=B|T]) ->
     {Args, Rest} = ?util:take_block_list([B|T]),
     [{macro, P, N, [parse_expr(A)||A<-Args]} | parse_expr(Rest)];
-parse_expr([{macro,P,N,_}=M | T]) ->
+parse_expr([{macro,P,N,_} | T]) ->
     [{macro, P, N, none} | parse_expr(T)];
 parse_expr([?k('#'), ?k(atom)=R, ?k('.'), ?k(atom)=F | T]) ->
     [{recfield, R, F} | parse_expr(T)];
@@ -273,12 +270,6 @@ range({_, P, T, _}) ->
 
 %% Split token list at "; Name ?LPAR", where Name is the same
 %% as the first token which must be an atom.
-take_until_semicolon_name([{K, _, _, Name}|_]=L) when K==atom;K==var ->
-    Pred = fun  ([{AK,_,_,AName}, ?k(?LPAR)|_]) when AK==K, AName==Name -> true;
-                (_) -> false
-            end,
-    ?util:take_until_token(L , ';', Pred).
-
 split_at_semicolon_name([{K, _, _, Name}|_]=L) when K==atom;K==var ->
     Pred = fun  ([{AK,_,_,AName}, ?k(?LPAR)|_]) when AK==K, AName==Name -> true;
                 (_) -> false
@@ -286,52 +277,8 @@ split_at_semicolon_name([{K, _, _, Name}|_]=L) when K==atom;K==var ->
     ?util:split_at_token(L , ';', Pred).
 
 %% Split token list at "; ?LPAR"
-take_until_semicolon_paren(L) ->
-    Pred = fun  ([?k(?LPAR)|_]) -> true;
-                (_) -> false
-            end,
-    ?util:take_until_token(L , ';', Pred).
-
 split_at_semicolon_paren(L) ->
     Pred = fun  ([?k(?LPAR)|_]) -> true;
                 (_) -> false
             end,
     ?util:split_at_token(L , ';', Pred).
-
-
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-take_until_semicolon_name_test_() ->
-    [
-     ?_assertEqual({scan("a,b"), none, []},
-                   take_until_semicolon_name(scan("a,b"))),
-     ?_assertEqual({scan("a;b"), none, []},
-                   take_until_semicolon_name(scan("a;b"))),
-     ?_assertEqual({scan("a;a,b"), none, []},
-                   take_until_semicolon_name(scan("a;a,b"))),
-     ?_assertEqual({scan("a"), {';',{0,2},";",undefined},
-                    scan("  a(b")},
-                   take_until_semicolon_name(scan("a;a(b"))),
-     ?_assertEqual({scan("a;c(d,e)f"), none, []},
-                   take_until_semicolon_name(scan("a;c(d,e)f")))
-    ].
-
-take_until_semicolon_paren_test_() ->
-    [
-     ?_assertEqual({scan("a,b"), none, []},
-                   take_until_semicolon_paren(scan("a,b"))),
-     ?_assertEqual({scan("a;b"), none, []},
-                   take_until_semicolon_paren(scan("a;b"))),
-     ?_assertEqual({scan("a"), {';',{0,2},";",undefined}, scan("  (b")},
-                   take_until_semicolon_paren(scan("a;(b"))),
-     ?_assertMatch({[], none, []},
-                   take_until_semicolon_paren([]))
-    ].
-
-scan(D) ->
-    {ok, Ts, _} = sourcer_scan:string(D),
-    sourcer_scan:filter_ws_tokens(Ts).
-
--endif.

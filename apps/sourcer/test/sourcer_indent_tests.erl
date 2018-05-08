@@ -22,7 +22,7 @@ default_indent_prefs_test_() ->
                    sourcer_indent:get_prefs(PrefC))].
 
 all_test_() ->
-    Dir = filename:dirname(code:which(?MODULE)) ++ "/" ++ ?MODULE_STRING ++ "_data",
+    Dir = filename:dirname(code:which(?MODULE)) ++ "/indent_data",
     OrigFs = filelib:wildcard(Dir ++ "/*"),
     io:format("Dir: ~s~nFs: ~p~n", [Dir, OrigFs]),
     Fs = [{File, unindent(File)} || File <- OrigFs,

@@ -109,7 +109,7 @@ kind_small(char) -> ?TOK_CHAR;
 kind_small('->') -> ?TOK_ARROW;
 kind_small(comment) -> ?TOK_COMMENT;
 kind_small(Kind) when is_atom(Kind) ->
-    case sourcer_scan:reserved_word(Kind) of
+    case erl_scan:reserved_word(Kind) of
         true ->
             ?TOK_KEYWORD;
         false ->

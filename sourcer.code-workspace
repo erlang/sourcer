@@ -5,7 +5,12 @@
 		},
 		{
 			"path": "../vscode-erlang-lsp"
+		},
+		{
+			"path": "/home/vlad/projects/rebar3"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"erlang.runtime": "v20"
+	}
 }
