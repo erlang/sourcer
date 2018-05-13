@@ -86,7 +86,7 @@ handle_cast({Method, Params}, State=#state{user_module=Mod}) ->
 			try
 				Mod:Method(State#state.user_state, Params)
 			catch _:E ->
-				?DEBUG("####################~nERROR: ~p (~p:~p ~p) ~n-- ~p~n", [E, Mod, Method, Params, erlang:get_stacktrace()]),
+				?DEBUG("####################~nERROR: ~p~n(~p:~p ~p) ~n-- ~p~n", [E, Mod, Method, Params, erlang:get_stacktrace()]),
 				State#state.user_state
 			end;
 		false ->
@@ -132,7 +132,7 @@ start_worker(Id, Method, Params, State) ->
 						try
 							sourcer:Method(UserState, Params, Reporter)
 						catch _:E ->
-							?DEBUG("####################~nERROR: ~p ~n", [E]),
+							?DEBUG("####################~nERROR: ~p~n(~p:~p ~p) ~n-- ~p~n", [E, Mod, Method, Params, erlang:get_stacktrace()]),
 							% Mod:default_answer(Method)
 							null
 						end;

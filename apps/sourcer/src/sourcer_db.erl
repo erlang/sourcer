@@ -80,8 +80,13 @@ get_info(_Uri, _Key, _DB) ->
 
 get_text(Uri, DB) ->
     Models = DB#db.models,
-    Entry = dict:fetch(Uri, Models),
-    Entry#db_entry.text.
+    case dict:find(Uri, Models) of
+        {ok, Entry} ->
+            Entry#db_entry.text;
+        Error ->
+            ?D({uri_not_found, Uri, dict:fetch_keys(Models)}),
+            <<>>
+    end.
 
 get_text(_Uri, _Range, _DB) ->
     [].
