@@ -30,17 +30,17 @@ hover(Uri, Position, DB) ->
             []
     end.
 
--spec definition(uri(), pos(), db()) -> [location()].
+-spec definition(uri(), pos(), db()) -> [def()].
 definition(Uri, Position, DB) ->
     Model = sourcer_db:get_model(Uri, DB),
     case sourcer_model:get_elements_at_pos(Model, Position) of 
         {_, [#def{}=Def|_]} ->
-            def_for({Uri, Def});
+            [{Uri, Def}];
         {_, [#ref{ctx=Key}|_]} ->
             %% TODO not variables!
-            def_for(get_def(Key, DB)); 
+            get_def(Key, DB); 
         {[#def{}=Def], _} ->
-            def_for({Uri, Def});
+            [{Uri, Def}];
         _Other ->
             ?D({hover, "???", _Other}),
             []
@@ -86,8 +86,13 @@ symbols(Query, DB) ->
     lists:filter(Filter, lists:flatten([symbol_list(Uri, M#model.defs) || {Uri, #db_entry{model=M}}<-Models])).
 
 highlight(Uri, Position, DB) ->
-    Model = sourcer_db:get_model(Uri, DB),
-    [].
+    Refs = references(Uri, Position, #{includeDeclaration=>false}, DB),
+    LRefs = [X || {Uri, X}<-Refs],
+    ?D(LRefs),
+    Def = definition(Uri, Position, DB),
+    LDef = [X || {Uri, X}<-Def],
+    ?D(LDef),
+    LRefs++LDef.
 
 %%%%%%%%%%%%%%%%%%%
 
@@ -115,11 +120,6 @@ hover_content(Key, SpecDoc, Spec, Doc) ->
 ",
     io_lib:format(Fmt, 
         [sourcer_lsp:print_name(Key), SpecDoc, ["```\n", Spec, "```\n"], Doc]).
-
-def_for([]) ->
-    [];
-def_for({Uri,#def{name_range=Range}}) ->
-    [#{uri=>Uri, range=>Range}].
 
 get_def(Key, DB) ->
     Entries = dict:to_list(DB#db.models),

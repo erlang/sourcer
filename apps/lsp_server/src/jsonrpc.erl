@@ -264,7 +264,12 @@ send_ordered_replies(Socket, Pending, Results) ->
 	end.
 
 send_tcp(Socket, Ans) ->
-	Json = jsx:encode(encode(Ans)),
+	Json = try  
+		jsx:encode(encode(Ans))  
+		catch _:E ->  
+			?DEBUG("json error: ~p: ~p~n", [E, Ans]), 
+		[] 
+	end, 
 	Hdr = io_lib:format("Content-Length: ~w\r\n\r\n", [size(Json)]),
 	%?DEBUG("TCP:: ~s~n", [[Hdr, Json]]),
 	_ = gen_tcp:send(Socket, Hdr),

@@ -164,6 +164,10 @@ symbols(Uri, Syms) ->
         }
         || #def{ctx=Key,name_range=Range}<-Syms].
 
-highlight(_) ->
-    [].
+highlight(L) when is_list(L) ->
+    [highlight(X) || X<-L];
+highlight(#ref{range=Range}) ->
+    #{range=>range(Range), kind=>2};
+highlight(#def{name_range=Range}) ->
+    #{range=>range(Range), kind=>3}.
 
