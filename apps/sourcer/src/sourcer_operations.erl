@@ -30,7 +30,7 @@ hover(Uri, Position, DB) ->
             []
     end.
 
--spec definition(uri(), pos(), db()) -> [def()].
+-spec definition(uri(), pos(), db()) -> [{uri(), def()}].
 definition(Uri, Position, DB) ->
     Model = sourcer_db:get_model(Uri, DB),
     case sourcer_model:get_elements_at_pos(Model, Position) of 
@@ -46,7 +46,8 @@ definition(Uri, Position, DB) ->
             []
     end.
 
--spec references(uri(), pos(), map(), db()) -> [{uri(), location()}].
+-type refdef() :: ref() | def().
+-spec references(uri(), pos(), map(), db()) -> [{uri(), refdef()}].
 references(Uri, Position, Context, DB) ->
     Model = sourcer_db:get_model(Uri, DB),
     case sourcer_model:get_elements_at_pos(Model, Position) of
@@ -88,10 +89,8 @@ symbols(Query, DB) ->
 highlight(Uri, Position, DB) ->
     Refs = references(Uri, Position, #{includeDeclaration=>false}, DB),
     LRefs = [X || {Uri, X}<-Refs],
-    ?D(LRefs),
     Def = definition(Uri, Position, DB),
     LDef = [X || {Uri, X}<-Def],
-    ?D(LDef),
     LRefs++LDef.
 
 %%%%%%%%%%%%%%%%%%%
@@ -151,8 +150,6 @@ get_refs_aux(Uri, Key, Item) ->
     case lists:keyfind(Key, #def.ctx, Item#db_entry.model#model.refs) of
         false ->
             [];
-        #def{}=Def ->
-            [{Uri, Def}];
         #ref{}=Ref ->
             [{Uri, Ref}]
     end.

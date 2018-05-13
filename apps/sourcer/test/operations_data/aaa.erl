@@ -4,6 +4,7 @@
 foo() ->
     bbb:bar().
 
+%% extra
 baz() ->
     ?MMM,
     ok.

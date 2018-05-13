@@ -23,8 +23,8 @@ symbols_test_() ->
         ?_assertMatch([
                     {_, 
                         {def,[{module,aaa},{function,mmm,0}],
-                            {{10,1},{10,4}},
-                            #{body := {{10,1},{11,7}}}}
+                            {{11,1},{11,4}},
+                            #{body := {{11,1},{12,7}}}}
                     }
                 ],
                 sourcer_operations:symbols(<<"mm">>, DB))
@@ -46,16 +46,52 @@ document_symbols_test_() ->
 hover_test_() ->
     DB = load_db(),
     [
+        ?_assertEqual(<<"">>, 
+            unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {2, 3}, DB))),
+        ?_assertEqual(<<"### aaa:foo/0\n\n\n\n```\n```\n\n\n\n">>, 
+            unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {3, 2}, DB))),
+        ?_assertEqual(<<"### aaa:baz/0\n\n\n\n```\n```\n\n\n%% extra\n\n">>, 
+            unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {7, 2}, DB)))
     ].
 
 definition_test_() ->
     DB = load_db(),
     [
+        ?_assertEqual([], sourcer_operations:definition(data_file("aaa.erl"), {2, 1}, DB)),
+        ?_assertMatch([
+            {
+                _,
+                {def,[{module,bbb},{function,bar,0}],
+                    {{3,1},{3,4}},
+                    #{body := {{3,1},{5,14}}}}
+            }], 
+            sourcer_operations:definition(data_file("aaa.erl"), {4, 10}, DB))
     ].
 
 references_test_() ->
     DB = load_db(),
     [
+        ?_assertEqual([], sourcer_operations:references(data_file("aaa.erl"), 
+            {2, 1}, #{}, DB)),
+        ?_assertMatch([
+            {
+                _,
+                {ref,[{module,bbb},{function,bar,0}],{{4,9},{4,12}}}
+            }], 
+            sourcer_operations:references(data_file("aaa.erl"), 
+                {4, 10}, #{includeDeclaration=>false}, DB)),
+        ?_assertMatch([
+            {
+                _,
+                {def,[{module,bbb},{function,bar,0}],
+                    {{3,1},{3,4}},
+                    #{body := {{3,1},{5,14}}}}
+            },
+            {
+                _, {ref,[{module,bbb},{function,bar,0}],{{4,9},{4,12}}}
+            }], 
+            sourcer_operations:references(data_file("aaa.erl"), 
+                {4, 10}, #{includeDeclaration=>true}, DB))
     ].
 
 completion_test_() ->
@@ -66,8 +102,18 @@ completion_test_() ->
 highlight_test_() ->
     DB = load_db(),
     [
+        ?_assertEqual([],
+            sourcer_operations:highlight(data_file("aaa.erl"), 
+                {2, 1}, DB)),
+        ?_assertEqual([
+                {ref,[{module,bbb},{function,bar,0}],{{4,9},{4,12}}},
+                {def,[{module,bbb},{function,bar,0}],
+                    {{3,1},{3,4}},
+                    #{body => {{3,1},{5,14}}}}
+            ],
+            sourcer_operations:highlight(data_file("aaa.erl"), 
+                {4, 10}, DB))
     ].
-
 
 load_db() ->
     Dir = data_dir(),
