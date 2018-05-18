@@ -246,13 +246,15 @@ parse_field([{atom,_,_,FN}=F, ?k('=')|T]) ->
 predef_macros(Module, File) ->
     Machine = list_to_atom(erlang:system_info(machine)),
     Anno = #{line=>1},
+    Release = erlang:list_to_integer(erlang:system_info(otp_release)),
     [
      {'FILE',-1, [], [{string, Anno#{value=>File}}]},
      {'LINE',-1, [], [{integer, Anno#{value=>1}}]},
      {'MODULE', -1, [], [{atom, Anno#{value=>Module}}]},
      {'MODULE_STRING', -1, [], [{string, Anno#{value=>atom_to_list(Module)}}]},
      {'MACHINE',-1, [], [{atom, Anno#{value=>Machine}}]},
-     {Machine,-1, [], [{atom, Anno#{value=>true}}]}
+     {Machine,-1, [], [{atom, Anno#{value=>true}}]},
+     {'OTP_RELEASE',-1, [], [{integer, Anno#{value=>Release}}]}
     ].
 
 range({_,P1,_,_}, {_,P2,T2,_}) ->
