@@ -52,7 +52,7 @@ handle_call({'initialize', Id, Params},
 	{Reply, NewUserState} = Mod:initialize(Params),
 	reply(Id, Reply),
 	{reply, error, State#state{user_state=NewUserState, stopped=false}};
-handle_call({Method, Id, Params},
+handle_call({_Method, Id, _Params},
 		_From, State=#state{user_module = Mod, stopped=true}) ->
 	reply(Id, Mod:error(server_not_initialized, "Server was stopped")),
 	{reply, error, State};

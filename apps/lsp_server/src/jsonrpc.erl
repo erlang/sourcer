@@ -26,12 +26,18 @@
 -define(DEBUG(F, A), ok).
 -endif.
 
-start_link(Port, Server, Client) ->
-	start_link(Port, Server, Client, []).
+start_link(Args, Server, Client) ->
+	start_link(Args, Server, Client, []).
 
-start_link(Port, Server, Client, Options) ->
+start_link({tcp, Port}, Server, Client, Options) ->
 	Pid = proc_lib:spawn_link(fun() ->
-				start(Port, Server, Client, Options)
+				start_tcp(Port, Server, Client, Options)
+			end),
+	register(?MODULE, Pid),
+	{ok, Pid};
+start_link(stdio, Server, Client, Options) ->
+	Pid = proc_lib:spawn_link(fun() ->
+				start_stdio(Server, Client, Options)
 			end),
 	register(?MODULE, Pid),
 	{ok, Pid}.
@@ -50,7 +56,7 @@ send_reply(Id, Answer) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start(Port, Server, Client, Options) ->
+start_tcp(Port, Server, Client, Options) ->
 	?TRACE("LSP: Start connection on port ~w~n", [Port]),
     {ok, LSock} = gen_tcp:listen(Port, [binary, {packet, 0}, {active, true}]),
 	case gen_tcp:accept(LSock) of
@@ -62,42 +68,71 @@ start(Port, Server, Client, Options) ->
 		ok
 	end.
 
-loop(Socket, Server, Client, Options, Buf, Pending, Results) ->
+start_stdio(Server, Client, Options) ->
+	?TRACE("LSP: Start connection on stdio~n", []),
+	Handler = stdio_accept(self()),
+	loop(Handler, Server, Client, Options, <<"">>, queue:new(), []).
+
+stdio_accept(Self) ->
+	spawn(fun() -> 
+			stdio_loop(Self) 
+		end).
+
+loop(Handler, Server, Client, Options, Buf, Pending, Results) ->
 	receive
 		{notify, Method, Params} ->
 			%?TRACE("Notify ~p", [Method]),
-			notify(Socket, Method, Params),
-			loop(Socket, Server, Client, Options, Buf, Pending, Results);
+			notify(Handler, Method, Params),
+			loop(Handler, Server, Client, Options, Buf, Pending, Results);
 		{request, Id, Method, Params} ->
 			%?TRACE("Request ~w ~p", [Id, Method]),
-			request(Socket, Id, Method, Params),
-			loop(Socket, Server, Client, Options, Buf, Pending, Results);
+			request(Handler, Id, Method, Params),
+			loop(Handler, Server, Client, Options, Buf, Pending, Results);
 		{request, Id, Method} ->
 			%?TRACE("Request ~w ~p", [Id, Method]),
-			request(Socket, Id, Method),
-			loop(Socket, Server, Client, Options, Buf, Pending, Results);
+			request(Handler, Id, Method),
+			loop(Handler, Server, Client, Options, Buf, Pending, Results);
 		{reply, Id, Answer} ->
 			%?TRACE("Reply ~w ~p~n", [Id, Answer]),
 			Results1 = [{Id, Answer} | Results],
 			%?TRACE("Reply queue:: ~p~n", [Results1]),
-			{NewPending, NewResults} = send_replies(Socket, Pending, Options, Results1),
+			{NewPending, NewResults} = send_replies(Handler, Pending, Options, Results1),
 			%?TRACE("Sent!?:: ~p~n", [{NewPending, NewResults}]),
-			loop(Socket, Server, Client, Options, Buf, NewPending, NewResults);
-		{tcp, Socket, Data} ->
+			loop(Handler, Server, Client, Options, Buf, NewPending, NewResults);
+		{tcp, Handler, Data} ->
 			%?TRACE("TCP", []),
 			Buf2 = <<Buf/binary, Data/binary>>,
 			{ok, Msgs, Buf3} = try_decode(Buf2),
 			NewPending = process_messages(Msgs, Pending, Server, Client),
-			loop(Socket, Server, Client, Options, Buf3, NewPending, Results);
-		{tcp_error, Socket, _Error} ->
+			loop(Handler, Server, Client, Options, Buf3, NewPending, Results);
+		{data, Data} ->
+			%?TRACE("STDIO", []),
+			Buf2 = <<Buf/binary, Data/binary>>,
+			{ok, Msgs, Buf3} = try_decode(Buf2),
+			NewPending = process_messages(Msgs, Pending, Server, Client),
+			loop(Handler, Server, Client, Options, Buf3, NewPending, Results);
+		{tcp_error, Handler, _Error} ->
 			?TRACE("LSP: TCP error, exiting: ~p~n", [_Error]),
 			ok;
-		{tcp_closed, Socket} ->
+		{tcp_closed, Handler} ->
 			?TRACE("LSP: closing connection~n", []),
 			ok;
 		_Other ->
 			?TRACE("LSP: unknown message: ~p~n", [_Other]),
-			loop(Socket, Server, Client, Options, Buf, Pending, Results)
+			loop(Handler, Server, Client, Options, Buf, Pending, Results)
+	end.
+
+stdio_loop(Peer) ->
+	case io:get_line('') of
+		eof ->
+			?TRACE("jsonrpc eof~n", []),
+			ok;
+		{error, Error} ->
+			?TRACE("jsonrpc error: ~p~n", [Error]),
+			ok;
+		Data ->
+			Peer ! {data, Data},
+			stdio_loop(Peer)
 	end.
 
 try_decode(Buf) ->
@@ -188,32 +223,32 @@ dispatch(#{jsonrpc := <<"2.0">>,
 	?DEBUG("<# RECV: NOTIFICATION ~tp~n", [Method]),
 	gen_server:cast(Server, {Method, none}).
 
-notify(Socket, Method, Params) ->
+notify(Handler, Method, Params) ->
 	?DEBUG("#> SEND: NOTIFY ~tp ~tp~n", [Method, Params]),
 	Ans = #{jsonrpc => <<"2.0">>,
 			method => Method,
 			params => Params
 		},
-	send_tcp(Socket, Ans).
+	send_tcp(Handler, Ans).
 
-request(Socket, Id, Method, Params) ->
+request(Handler, Id, Method, Params) ->
 	?DEBUG("#> SEND: REQUEST ~p: ~tp ~tp~n", [Id, Method, Params]),
 	Ans = #{jsonrpc => <<"2.0">>,
 			id => Id,
 			method => Method,
 			params => Params
 		},
-	send_tcp(Socket, Ans).
+	send_tcp(Handler, Ans).
 
-request(Socket, Id, Method) ->
+request(Handler, Id, Method) ->
 	?DEBUG("#> SEND: REQUEST ~p: ~tp ~n", [Id, Method]),
 	Ans = #{jsonrpc => <<"2.0">>,
 			id => Id,
 			method => Method
 		},
-	send_tcp(Socket, Ans).
+	send_tcp(Handler, Ans).
 
-reply(Socket, Id, {error, Code0, Msg})  ->
+reply(Handler, Id, {error, Code0, Msg})  ->
 	Code = error_code_enc(Code0),
 	?DEBUG("#> SEND: REPLY ~p: ~tp~n", [Id, Msg]),
 	Ans = #{jsonrpc => <<"2.0">>,
@@ -223,28 +258,28 @@ reply(Socket, Id, {error, Code0, Msg})  ->
 					    message => Msg
 					}
 		},
-	send_tcp(Socket, Ans);
-reply(Socket, Id, Msg) when is_map(Msg); is_list(Msg); Msg==null ->
+	send_tcp(Handler, Ans);
+reply(Handler, Id, Msg) when is_map(Msg); is_list(Msg); Msg==null ->
 	?DEBUG("#> SEND: REPLY ~p: ~tp~n", [Id, Msg]),
 	Ans = #{jsonrpc => <<"2.0">>,
 			id => Id,
 			result => Msg
 		},
-	send_tcp(Socket, Ans);
-reply(_Socket, Id, Msg) ->
+	send_tcp(Handler, Ans);
+reply(_Handler, Id, Msg) ->
 	?TRACE("Erroneous reply: ~tp~n",[{Id, Msg}]),
 	ok.
 
-send_replies(Socket, Pending, Options, Results) -> 
+send_replies(Handler, Pending, Options, Results) -> 
 	case proplists:get_value(ordered_replies, Options, true) of
 		true ->
 			%?TRACE("ORDERED...",[]),
-			send_ordered_replies(Socket, Pending, Results);
+			send_ordered_replies(Handler, Pending, Results);
 		false ->
-			[reply(Socket, Id, Answer) || {Id, Answer} <- Results]
+			[reply(Handler, Id, Answer) || {Id, Answer} <- Results]
 	end.
 
-send_ordered_replies(Socket, Pending, Results) ->
+send_ordered_replies(Handler, Pending, Results) ->
 	%?TRACE(" -- ~p", [queue:peek(Pending)]),
 	case queue:peek(Pending) of	
 		empty ->
@@ -257,13 +292,13 @@ send_ordered_replies(Socket, Pending, Results) ->
 					{Pending, Results};
 				{Id, Answer} ->
 					%?TRACE("  -- R:: ~p", [Id]), 
-					reply(Socket, Id, Answer), 
+					reply(Handler, Id, Answer), 
 					{_, Rest} = queue:out(Pending),
-					send_ordered_replies(Socket, Rest, lists:keydelete(Id, 1, Results)) 
+					send_ordered_replies(Handler, Rest, lists:keydelete(Id, 1, Results)) 
 			end
 	end.
 
-send_tcp(Socket, Ans) ->
+send_tcp(Handler, Ans) ->
 	Json = try  
 		jsx:encode(encode(Ans))  
 		catch _:E ->  
@@ -272,9 +307,15 @@ send_tcp(Socket, Ans) ->
 	end, 
 	Hdr = io_lib:format("Content-Length: ~w\r\n\r\n", [size(Json)]),
 	%?DEBUG("TCP:: ~s~n", [[Hdr, Json]]),
-	_ = gen_tcp:send(Socket, Hdr),
-	_ = gen_tcp:send(Socket, Json),
-	ok.
+	case is_port(Handler) of
+		true ->
+			_ = gen_tcp:send(Handler, Hdr),
+			_ = gen_tcp:send(Handler, Json),
+			ok;
+		false ->
+			io:format("~s~s",[Hdr, Json]),
+			ok
+	end.
 
 decode(Json) when is_map(Json) ->
 	L1 = maps:to_list(Json),

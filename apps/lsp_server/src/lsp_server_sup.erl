@@ -16,9 +16,16 @@ init([]) ->
     {ok, {{one_for_one, 0, 1}, Children}}.
 
 children() ->
-    {ok, Port} = application:get_env(lsp_server, port),
+    {ok, Transport} = application:get_env(lsp_server, transport),
+    Args = case Transport of 
+            stdio ->
+                stdio;
+            tcp ->
+                {ok, Port} = application:get_env(lsp_server, port),
+                {tcp, Port}
+        end,
     {ok, Implementor} = application:get_env(lsp_server, implementor),
-    JsonRpc = {jsonrpc, {jsonrpc, start_link, [Port, lsp_server, lsp_client]},
+    JsonRpc = {jsonrpc, {jsonrpc, start_link, [Args, lsp_server, lsp_client]},
         permanent, 60000, worker, [jsonrpc]},
     IdeServer = {lsp_server, {lsp_server, start_link, [Implementor]},
         permanent, 60000, worker, [lsp_server]},

@@ -2,6 +2,7 @@
 
 -export([main/1]).
 
+-define(DEFAULT_TRANSPORT, tcp).
 -define(DEFAULT_PORT, 9000).
 
 main(Args) ->
@@ -16,14 +17,15 @@ main(Args) ->
 
 cli_options() ->
     [
-     {help,    $h,        "help",    undefined, "Show this help"},
-     {dump,    $d,        "dump",    string,    "Dump sourcer db for file or project"},
-     {format,  undefined, "fmt",     {atom, raw},    "Format for the dump (default: raw)"},
+     {help,    $h,        "help",    undefined,    "Show this help"},
+     {dump,    $d,        "dump",    string,       "Dump sourcer db for file or project"},
+     {format,  undefined, "fmt",     {atom, raw},  "Format for the dump (default: raw)"},
      {out,     undefined, "out",     {string, standard_io},    "Destination file for the dump (default: standard_io)"},
-     {port,    $p,        "port",    integer,   "LSP server port"},
-     {verbose, $v,        "verbose", integer,   "Verbosity level"},
-     {indent,  $i,        "indent",  string,    "Indent file(s) and exit"},
-     {config,  undefined, "config",  string,    "Configuration file"}
+     {transport,$t,       "transport",{atom, tcp}, "Transport layer for communication (default: tcp, stdio)"},
+     {port,    $p,        "port",    integer,      "LSP server port"},
+     {verbose, $v,        "verbose", integer,      "Verbosity level"},
+     {indent,  $i,        "indent",  string,       "Indent file(s) and exit"},
+     {config,  undefined, "config",  string,       "Configuration file"}
     ].
 
 run(Opts, Other) ->
@@ -55,10 +57,15 @@ run(Opts, Other) ->
     end.
 
 start_server(Opts, Config) ->
-    Port = maps:get(port, Opts, proplists:get_value(port, Config, ?DEFAULT_PORT)),
+    Transport = maps:get(transport, Opts, proplists:get_value(transport, Config, ?DEFAULT_TRANSPORT)),
 
     ok = application:load(lsp_server),
-    ok = application:set_env(lsp_server, port, Port),
+    ok = application:set_env(lsp_server, transport, Transport),
+    case Transport of
+        tcp ->
+            Port = maps:get(port, Opts, proplists:get_value(port, Config, ?DEFAULT_PORT)),
+            ok = application:set_env(lsp_server, port, Port)
+    end,
     ok = application:set_env(lsp_server, implementor, sourcer),
 
     case application:ensure_all_started(lsp_server, permanent) of
