@@ -64,7 +64,9 @@ start_server(Opts, Config) ->
     case Transport of
         tcp ->
             Port = maps:get(port, Opts, proplists:get_value(port, Config, ?DEFAULT_PORT)),
-            ok = application:set_env(lsp_server, port, Port)
+            ok = application:set_env(lsp_server, port, Port);
+        _ ->
+            ok
     end,
     ok = application:set_env(lsp_server, implementor, sourcer),
 
