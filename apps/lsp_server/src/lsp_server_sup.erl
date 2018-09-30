@@ -24,10 +24,10 @@ children() ->
                 {ok, Port} = application:get_env(lsp_server, port),
                 {tcp, Port}
         end,
-    {ok, Implementor} = application:get_env(lsp_server, implementor),
+    {ok, Backend} = application:get_env(lsp_server, backend),
     JsonRpc = {jsonrpc, {jsonrpc, start_link, [Args, lsp_server, lsp_client]},
         permanent, 60000, worker, [jsonrpc]},
-    IdeServer = {lsp_server, {lsp_server, start_link, [Implementor]},
+    IdeServer = {lsp_server, {lsp_server, start_link, [Backend]},
         permanent, 60000, worker, [lsp_server]},
     IdeClient = {lsp_client, {lsp_client, start_link, []},
         permanent, 60000, worker, [lsp_client]},

@@ -68,7 +68,7 @@ start_server(Opts, Config) ->
         _ ->
             ok
     end,
-    ok = application:set_env(lsp_server, implementor, sourcer),
+    ok = application:set_env(lsp_server, backend, sourcer),
 
     case application:ensure_all_started(lsp_server, permanent) of
         {ok, _R} ->
