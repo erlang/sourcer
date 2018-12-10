@@ -24,7 +24,7 @@
     get_uri/2
 ]).
 
--define(DEBUG, true).
+%%-define(DEBUG, true).
 -include("debug.hrl").
 
 -include("sourcer_model.hrl").

@@ -1,6 +1,6 @@
 -module(sourcer_scan).
 
--define(DEBUG, true).
+%%-define(DEBUG, true).
 -include("debug.hrl").
 
 -export([line_info/1, split_lines/1,

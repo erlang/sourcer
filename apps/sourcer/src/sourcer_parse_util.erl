@@ -17,7 +17,7 @@
     take_block_list/1
 ]).
 
--define(DEBUG, true).
+%%-define(DEBUG, true).
 -include("debug.hrl").
 
 -define(k(X), {X,_,_,_}).

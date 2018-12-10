@@ -32,7 +32,7 @@ start_link(Mod) ->
 				%% (unless it's a worskpace operation)
 			   }).
 
--define(DEBUG, true).
+%%-define(DEBUG, true).
 
 -ifdef(DEBUG).
 -define(DEBUG(F, A), io:format(F, A)).
