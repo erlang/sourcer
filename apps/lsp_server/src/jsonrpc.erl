@@ -12,8 +12,8 @@
 		send_reply/2
 	]).
 
--define(TRACE, true).
--define(DEBUG, true).
+%%-define(TRACE, true).
+%%-define(DEBUG, true).
 
 -ifdef(TRACE).
 -define(TRACE(F, A), io:format(F, A)).
@@ -75,7 +75,8 @@ start_stdio(Server, Client, Options) ->
 
 stdio_accept(Self) ->
 	spawn(fun() -> 
-			stdio_loop(Self) 
+			InPort = stdio_init(),
+			stdio_loop(Self, InPort)
 		end).
 
 loop(Handler, Server, Client, Options, Buf, Pending, Results) ->
@@ -122,17 +123,33 @@ loop(Handler, Server, Client, Options, Buf, Pending, Results) ->
 			loop(Handler, Server, Client, Options, Buf, Pending, Results)
 	end.
 
-stdio_loop(Peer) ->
-	case io:get_line('') of
-		eof ->
-			?TRACE("jsonrpc eof~n", []),
-			ok;
-		{error, Error} ->
-			?TRACE("jsonrpc error: ~p~n", [Error]),
-			ok;
-		Data ->
-			Peer ! {data, Data},
-			stdio_loop(Peer)
+stdio_init() ->
+    %% Open a port to read from standard input instead of using one of
+    %% the io built-ins.
+    %%
+    %% io:get_line/1 will not work since (at least) lsp-mode for emacs
+    %% will send an LSP packet with a trailing "}" for the jsonrpc but
+    %% no newline.
+    %%
+    %% io:get_chars/2 would work, but forces us to read 1 character at
+    %% a time which is unnecessarily inefficient.
+    %%
+    %% Open a port towards fd 0 instead.  Requires the erlang node to
+    %% be started with parameter "-noinput".
+    open_port({fd, 0, 1}, [in, binary, stream]).
+
+stdio_loop(Peer, InPort) ->
+        receive
+            {InPort, {data, Data}} ->
+                ?TRACE("jsonrpc data: ~p~n", [Data]),
+                Peer ! {data, Data},
+                stdio_loop(Peer, InPort);
+            {'EXIT', InPort, normal} ->
+                ?TRACE("jsonrpc in port closed~n", []),
+                ok;
+            {'EXIT', InPort, Reason} ->
+                ?TRACE("jsonrpc in port closed with reason: ~p~n", [Reason]),
+                ok
 	end.
 
 try_decode(Buf) ->

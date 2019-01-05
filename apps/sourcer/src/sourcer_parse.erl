@@ -9,7 +9,7 @@
     range/1
 ]).
 
--define(DEBUG, 1).
+%%-define(DEBUG, 1).
 -include("debug.hrl").
 
 -include("sourcer_model.hrl").
