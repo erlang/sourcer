@@ -25,6 +25,7 @@ cli_options() ->
      {port,    $p,        "port",    integer,      "LSP server port"},
      {verbose, $v,        "verbose", integer,      "Verbosity level"},
      {indent,  $i,        "indent",  string,       "Indent file(s) and exit"},
+     {stdout,  undefined, "stdout",  {boolean, false},       "Output to stdout instead of in place"},
      {config,  undefined, "config",  string,       "Configuration file"}
     ].
 
@@ -48,9 +49,9 @@ run(Opts, Other) ->
                         Out
                 end,
             sourcer_dump:dump(DumpFile, Fmt, Out1);
-        #{indent := Indent} ->
+        #{indent := Indent, stdout := Stdout} ->
             IndentConfig = proplists:get_value(indent, Config, []),
-            indent([Indent|Other], IndentConfig, Verbose);
+            indent([Indent|Other], IndentConfig, Stdout, Verbose);
         _ ->
             ServerConfig = proplists:get_value(server, Config, []),
             start_server(Opts, ServerConfig)
@@ -91,30 +92,40 @@ maybe_load_config(File, Verbose) ->
             erlang:halt(1)
     end.
 
-indent([File|Files], Config, Verbose) ->
+indent([File|Files], Config, Stdout, Verbose) ->
+    Output = output(Stdout, File),
     try case file:read_file(File) of
             {ok, BinSrc} ->
                 Enc = encoding(BinSrc),
                 Src = unicode:characters_to_list(BinSrc, Enc),
                 {ST,Indented} = timer:tc(fun() -> sourcer_indent:all(Src, Config) end),
-                ok = file:write_file(File, unicode:characters_to_binary(Indented, utf8, Enc)),
-                Verbose > 0 andalso io:format("Indent: ~.6wms ~s~n", [ST div 1000, File]),
-                indent(Files, Config, Verbose);
+                ok = Output(unicode:characters_to_binary(Indented, utf8, Enc)),
+                Verbose > 0 andalso io:format(standard_error, "Indent: ~.6wms ~s~n", [ST div 1000, File]),
+                indent(Files, Config, Stdout, Verbose);
             {error, Error} ->
                 Str = io_lib:format("Could not read file: ~ts\n Reason: ~p~n", [File, Error]),
                 throw({error,Str})
         end
     catch throw:{error, Desc} ->
-            io:format("~ts", [Desc]),
+            io:format(standard_error, "~ts", [Desc]),
             erlang:halt(1);
           error:What ->
-            io:format("Error could not indent file: ~ts\n", [File]),
-            Verbose > 0 andalso io:format("Error ~p~n", [What]),
-            Verbose > 1 andalso io:format("Stacktrace ~p~n", [erlang:get_stacktrace()]),
+            io:format(standard_error, "Error could not indent file: ~ts\n", [File]),
+            Verbose > 0 andalso io:format(standard_error, "Error ~p~n", [What]),
+            Verbose > 1 andalso io:format(standard_error, "Stacktrace ~p~n", [erlang:get_stacktrace()]),
             erlang:halt(1)
     end;
-indent([], _, _) ->
+indent([], _, _, _) ->
     ok.
+
+output(false, File) ->
+    fun(C) ->
+            file:write_file(File, C)
+    end;
+output(true, _) ->
+    fun(C) ->
+            io:format(standard_io, "~s", [C])
+    end.
 
 encoding(Bin) ->
     case epp:read_encoding_from_binary(Bin) of
