@@ -76,7 +76,7 @@ dump_raw(Files, Out) ->
             io:format(Out, "References:::~n~*p~n-----~n", [C, lists:sort(R)]),
             ok;
         Err ->
-            io:format("~p~n", [Err])
+            io:format("Error:: ~p~n", [Err])
     end.
 
 -define(NL, #xmlText{value=[10]}).

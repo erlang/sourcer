@@ -40,7 +40,7 @@ text_edit(NewText, Range) ->
         newText=>unicode:characters_to_binary(NewText)}.
 
 definition(Defs) ->
-    [location(Uri, Range) || #{uri:=Uri, range:=Range}<-Defs].
+    [location(Uri, Range) || {Uri, #def{name_range=Range}}<-Defs].
 
 references(L) ->
     Fun = fun({Uri, #ref{range=Y}}) -> location(Uri, Y);

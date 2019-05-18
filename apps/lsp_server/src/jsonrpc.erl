@@ -26,7 +26,7 @@
 -define(DEBUG(F, A), ok).
 -endif.
 
--define(STORE_MESSAGES, true).
+-define(STORE_MESSAGES, false).
 -ifdef(STORE_MESSAGES).
 -define(STORE(Msg), msg_tracer ! {msg, Msg}).
 -else.
@@ -69,7 +69,12 @@ start_tcp(Port, Server, Client, Options) ->
 	case gen_tcp:accept(LSock) of
 		{ok, Socket} ->
 			?TRACE("LSP: Listening on: ~p~n", [Socket]),
-			loop(Socket, Server, Client, Options, <<"">>, queue:new(), []);
+			try
+				%% We support only one client, no need to spawn a process
+				loop(Socket, Server, Client, Options, <<"">>, queue:new(), [])
+			catch _:E ->
+				?TRACE("Exception thrown: ~p :: ~p~n", [E, erlang:get_stacktrace()])
+			end;
 		Err ->
 			?TRACE("LSP: Connection error: ~p~n", [Err]),
 		ok
@@ -190,7 +195,7 @@ try_decode_1(Buf, N) ->
 process_messages(Msgs, Pending, Server, Client) ->
 	Fun = fun(Msg, Acc) ->
 		M = parse(Msg),
-		?STORE(M),
+		?TRACE("~p~n", [M]),
 		spawn(fun() -> dispatch(M, Server, Client) end),
 		case maps:is_key(id, M) of
 			true ->

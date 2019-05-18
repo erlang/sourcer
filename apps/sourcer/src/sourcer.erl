@@ -104,8 +104,9 @@
     {Server, #state{client_capabilities=InitializeParams, server_capabilities=Server}}.
 
 'initialized'(State, #{}) ->
+    %% TODO what if there is no root?
     R1 = maps:get(rootUri, State#state.client_capabilities),
-    R2 = sets:from_list([maps:get(uri, M) || 
+    R2 = sets:from_list([maps:get(uri, M) ||
             M <- maps:get(workspaceFolders, State#state.client_capabilities)]),
     Roots = sets:add_element(R1, R2),
     Wspace = sourcer_layout:detect_layouts(sets:to_list(Roots)),
