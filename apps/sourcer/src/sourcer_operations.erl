@@ -118,7 +118,7 @@ hover_content(Key, SpecDoc, Spec, Doc) ->
 ~s
 ",
     io_lib:format(Fmt, 
-        [sourcer_lsp:print_name(Key), SpecDoc, ["```\n", Spec, "```\n"], Doc]).
+        [sourcer_lsp:print_name(Key), SpecDoc, ["```\n", Spec, "\n```\n"], Doc]).
 
 get_def(Key, DB) ->
     Entries = dict:to_list(DB#db.models),

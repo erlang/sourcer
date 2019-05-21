@@ -48,9 +48,9 @@ hover_test_() ->
     [
         ?_assertEqual(<<"">>, 
             unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {2, 3}, DB))),
-        ?_assertEqual(<<"### aaa:foo/0\n\n\n\n```\n```\n\n\n\n">>, 
+        ?_assertEqual(<<"### aaa:foo/0\n\n\n\n```\n\n```\n\n\n\n">>, 
             unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {3, 2}, DB))),
-        ?_assertEqual(<<"### aaa:baz/0\n\n\n\n```\n```\n\n\n%% extra\n\n">>, 
+        ?_assertEqual(<<"### aaa:baz/0\n\n\n\n```\n\n```\n\n\n%% extra\n\n">>, 
             unicode:characters_to_binary(sourcer_operations:hover(data_file("aaa.erl"), {7, 2}, DB)))
     ].
 
