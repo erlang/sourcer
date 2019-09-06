@@ -5,5 +5,10 @@
     },
     "search.exclude": {
         "_build": true 
+    },
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#352D0F",
+        "titleBar.activeBackground": "#4A4015",
+        "titleBar.activeForeground": "#FCFBF5"
     }
 }
